@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>engpit</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" aria-label="engpit"><span>engp</span><span class="li">ı<i class="cap"></i></span><span>t</span></a>
+  <nav class="tabs">
+    <button data-tab="gacha" class="active">뽑기</button>
+    <button data-tab="study">단어 외우기</button>
+    <button data-tab="test">단어 테스트</button>
+    <button data-tab="dex">도감</button>
+  </nav>
+  <button class="mute" id="muteBtn" aria-label="소리 켜기/끄기">
+    <svg class="ic on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+    <svg class="ic off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
+  </button>
+  <div class="coin" id="coinBox" title="보유 코인"><i class="ci"></i><b id="coinNum">0</b></div>
+</header>
+
+<main>
+  <!-- 뽑기 -->
+  <section id="tab-gacha" class="tab active">
+    <div id="stage">
+      <div class="odds" id="odds"></div>
+      <div class="flash" id="flash"></div>
+      <div class="banner" id="banner"></div>
+      <div class="pullbar" id="pullbar">
+        <button class="pull" id="pullBtn"><b>뽑기</b><small><i class="ci"></i>1</small></button>
+        <div class="hint" id="pullHint"></div>
+      </div>
+      <div class="result" id="result">
+        <span class="rlabel" id="resRar"></span>
+        <h2 id="resName"></h2>
+        <p id="resDesc"></p>
+        <div class="rbtns">
+          <button class="btn" id="btnOk">확인</button>
+          <button class="btn" id="btnDism" hidden></button>
+          <button class="btn primary" id="btnAgain">한 번 더 <i class="ci"></i>1</button>
+          <span class="tip">드래그해서 돌려보기</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 단어 외우기 -->
+  <section id="tab-study" class="tab page">
+    <div class="wrap">
+      <div class="study-top">
+        <div class="seg" id="studySeg"><button data-f="all" class="on">전체</button><button data-f="miss">틀린 단어</button></div>
+        <span id="cardPos"></span>
+      </div>
+      <div class="chips" id="catChips"></div>
+      <div class="flash-card" id="fcard">
+        <div class="fc-inner">
+          <div class="fc-front"><span class="fc-cat" id="fcCat"></span><div class="fc-ko" id="fcKo"></div><div class="fc-tip">영어로 뭘까? 눌러서 확인</div></div>
+          <div class="fc-back"><div class="fc-en" id="fcEn"></div><div class="fc-ko-small" id="fcKo2"></div></div>
+        </div>
+      </div>
+      <div class="fc-btns">
+        <button class="btn" id="fcPrev">이전</button>
+        <button class="btn" id="fcSpeak">발음 듣기</button>
+        <button class="btn" id="fcShuffle">섞기</button>
+        <button class="btn" id="fcNext">다음</button>
+      </div>
+      <div class="go-test"><button class="btn primary" id="goTest">테스트 보고 코인 받기</button></div>
+
+      <h3>단어 목록 <small id="wordCount"></small></h3>
+      <div id="wordList"></div>
+    </div>
+  </section>
+
+  <!-- 단어 테스트: 뜻을 보고 영어 단어를 직접 쓴다 -->
+  <section id="tab-test" class="tab page">
+    <div class="wrap">
+      <div class="test-top">
+        <span class="fc-cat" id="qCat"></span>
+        <div class="streak">연속 정답<b id="streak">0</b><span class="best">최고 <b id="best">0</b></span></div>
+      </div>
+      <div class="qcard">
+        <div class="qlabel">이 뜻의 영어 단어를 써 보세요</div>
+        <div class="qword" id="qWord"></div>
+        <div class="tiles" id="tiles"></div>
+        <form id="ansForm" class="ansform" autocomplete="off">
+          <input id="ans" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="여기에 영어로 입력">
+          <button class="btn primary" id="ansBtn">확인</button>
+        </form>
+        <div class="ime" id="ime">한글로 입력되고 있어요. 한/영 키를 눌러 주세요.</div>
+        <div class="qtools">
+          <button class="btn" id="hintBtn" type="button">힌트 <span id="hintLeft"></span></button>
+          <button class="btn" id="skipBtn" type="button">모르겠어요</button>
+        </div>
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <p class="note">맞힐 때마다 코인 <i class="ci"></i> 1개, 5문제 연속으로 맞히면 보너스 1개를 더 받아요.</p>
+    </div>
+  </section>
+
+  <!-- 도감 -->
+  <section id="tab-dex" class="tab page">
+    <div class="wrap">
+      <div class="lvprog" id="lvProg"></div>
+      <div class="forge" id="forge"></div>
+      <div class="dex-stats" id="dexStats"></div>
+      <div class="dex-grid" id="dexGrid"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <button class="x" id="modalX" aria-label="닫기"><svg class="ic" style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="pv" id="pvWrap"></div>
+    <div class="pv-info" id="pvInfo"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
