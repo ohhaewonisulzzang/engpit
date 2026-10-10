@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { $ } from '../dom.js';
 import { state } from '../state.js';
-import { RAR, RARITIES, MAX_LEVEL, lvl, LEVELS, LUCK_MAX, SHARD_VALUE, chanceOf, pct } from '../config.js';
-import { canDismantle, spare, spareShards, dismantle, dismantleAll, buyLuck, luckMaxed, nextLuckCost } from '../forge.js';
-import { toast, renderOdds } from './common.js';
+import { RAR, RARITIES, MAX_LEVEL, lvl, LEVELS, LUCK_MAX, SHARD_VALUE, chanceOf, pct, machineCost } from '../config.js';
+import { canDismantle, spare, spareShards, dismantle, dismantleAll, buyLuck, luckMaxed, nextLuckCost, machineMaxed, payMachine } from '../forge.js';
+import { toast, renderOdds, switchTab } from './common.js';
+import { upgradeMachine } from '../gacha.js';
+import { armLevel, ARMS, KIND_NAME, lvMult } from '../battle/data.js';
 import { SFX } from '../sound.js';
 import { basic, disposeObj, makeEnv } from '../three/helpers.js';
 import { buildWeapon, WEAPONS } from '../three/weapons.js';
@@ -36,13 +38,21 @@ export function thumb(w, owned) {
   if (p.sc.overrideMaterial) { p.sc.overrideMaterial.dispose(); p.sc.overrideMaterial = null; }
   return thumbCache[k] = url;
 }
+// 전투용 무기 그림: 칼끝이 위로 가게 세운 모습
+export const spriteCache = {};
+export function sprite(w) {
+  if (spriteCache[w.id]) return spriteCache[w.id];
+  const p = getPV(); p.r.setPixelRatio(1); p.r.setSize(160, 160, false); p.cam.aspect = 1; p.cam.updateProjectionMatrix();
+  const o = buildWeapon(w, 3.6); o.rotation.set(0, .4, 0); o.userData.update?.(1.3);
+  p.sc.add(o); p.r.render(p.sc, p.cam);
+  const img = new Image(); img.src = p.r.domElement.toDataURL('image/png');
+  p.sc.remove(o); disposeObj(o);
+  return spriteCache[w.id] = img;
+}
 export function renderDex() {
   const owned = WEAPONS.filter(w => state.inv[w.id]).length;
   const acc = state.correct + state.wrong ? Math.round(state.correct / (state.correct + state.wrong) * 100) : 0;
-  const got = state.got.length, last = state.level >= MAX_LEVEL;
-  $('lvProg').innerHTML = `<div class="row"><b>Lv.${state.level} ${lvl().name}</b><span>${got}/${WEAPONS.length}</span></div>` +
-    `<div class="bar"><i style="width:${got / WEAPONS.length * 100}%"></i></div>` +
-    `<p>${last ? '마지막 기계예요. 여기서도 전부 모아 보세요.' : `이 기계에서 ${WEAPONS.length}종을 전부 뽑으면 ${LEVELS[state.level].name}로 업그레이드돼요. 다음 기계는 좋은 등급이 더 잘 안 나와요.`}</p>`;
+  renderMachine();
   renderForge();
   $('dexStats').innerHTML = [
     [`${owned}/${WEAPONS.length}`, '모은 무기'], [state.pulls, '뽑은 횟수'], [state.correct, '맞힌 문제'], [acc + '%', '정답률'],
@@ -50,7 +60,7 @@ export function renderDex() {
   $('dexGrid').innerHTML = [...WEAPONS].reverse().map(w => {
     const r = RAR[w.r], n = state.inv[w.id] || 0;
     return `<div class="dcard${n ? ' owned' : ''}" style="--rc:${r.color}" data-id="${w.id}">
-      ${n ? `<span class="cnt">×${n}</span>` : ''}${state.got.includes(w.id) ? '<span class="here">이 기계에서 뽑음</span>' : ''}
+      ${n ? `<span class="cnt">×${n}</span><span class="here">전투 Lv.${armLevel(n)}</span>` : ''}
       <img src="${thumb(w, !!n)}" alt="">
       <div class="rl${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</div>
       <div class="nm">${n ? w.name : '아직 못 뽑음'}</div></div>`;
@@ -91,17 +101,38 @@ $('modal').onclick = e => { if (e.target === $('modal')) closeModal(); };
 
 /* ========================================================= */
 
+/* ---------- 뽑기 기계 업그레이드 패널 ---------- */
+// state를 잠깐 바꿔서 확률을 계산해 보고 되돌린다 (다음 단계 미리보기용)
+function oddsWith(change) {
+  const undo = change(), o = Object.fromEntries(RARITIES.map(r => [r.key, chanceOf(r.key)])); undo();
+  return o;
+}
+const oddsRow = (now, next) => '<div class="fg-odds">' + ['ultra', 'legend', 'hero'].map(k =>
+  `<span style="--rc:${RAR[k].color}"><i class="cap-ic"></i>${RAR[k].name} ${pct(now[k])}% → <b>${pct(next[k])}%</b></span>`).join('') + '</div>';
+function renderMachine() {
+  const maxed = machineMaxed(), cost = maxed ? 0 : machineCost();
+  const now = oddsWith(() => () => {}), next = maxed ? now : oddsWith(() => (state.level++, () => state.level--));
+  $('lvProg').innerHTML = `<div class="fg-head">
+      <div><b>뽑기 기계 Lv.${state.level} ${lvl().name}</b><p>${maxed ? '최고 단계 기계예요.' : `조각으로 ${LEVELS[state.level].name}로 업그레이드하면 좋은 등급이 훨씬 잘 나와요.`}</p></div>
+      <div class="fg-stats"><div><b>${state.level}<small>/${MAX_LEVEL}</small></b>기계</div></div>
+    </div>
+    ${maxed ? '' : `<div class="bar"><i style="width:${Math.min(1, state.shards / cost) * 100}%"></i></div>${oddsRow(now, next)}`}
+    <div class="fg-btns"><button class="btn primary" id="buyMachine" ${maxed || state.shards < cost ? 'disabled' : ''}>${maxed ? '최고 단계' : `기계 업그레이드 (조각 ${state.shards}/${cost})`}</button></div>`;
+  $('buyMachine').onclick = () => {
+    if (!payMachine()) return;
+    switchTab('gacha'); upgradeMachine();
+  };
+}
+
 /* ---------- 분해와 행운 패널 ---------- */
 function renderForge() {
   const sp = spareShards(), cost = nextLuckCost(), maxed = luckMaxed();
   // 행운을 한 단계 올리면 바뀌는 확률을 미리 보여 줌
-  const now = Object.fromEntries(RARITIES.map(r => [r.key, chanceOf(r.key)]));
-  state.luck++; const next = Object.fromEntries(RARITIES.map(r => [r.key, chanceOf(r.key)])); state.luck--;
-  const preview = maxed ? '<p>행운이 최대예요.</p>' : '<div class="fg-odds">' + ['ultra', 'legend', 'hero'].map(k =>
-    `<span style="--rc:${RAR[k].color}"><i class="cap-ic"></i>${RAR[k].name} ${pct(now[k])}% → <b>${pct(next[k])}%</b></span>`).join('') + '</div>';
+  const now = oddsWith(() => () => {}), next = oddsWith(() => (state.luck++, () => state.luck--));
+  const preview = maxed ? '<p>행운이 최대예요.</p>' : oddsRow(now, next);
   $('forge').innerHTML = `
     <div class="fg-head">
-      <div><b>분해와 행운</b><p>남는 희귀·초희귀를 분해하면 조각이 나와요. 조각으로 행운을 올리면 모든 기계에서 좋은 등급이 조금씩 더 잘 나와요. 도감용으로 1개씩은 남겨 둬요.</p></div>
+      <div><b>분해와 행운</b><p>남는 희귀·초희귀를 분해하거나 전투에서 적을 잡으면 조각이 나와요. 조각으로 행운을 올리면 모든 기계에서 좋은 등급이 조금씩 더 잘 나와요. 분해하면 그 무기의 전투 레벨은 내려가요.</p></div>
       <div class="fg-stats"><div><b>${state.shards}</b>조각</div><div><b>${state.luck}<small>/${LUCK_MAX}</small></b>행운</div></div>
     </div>
     ${preview}
@@ -121,7 +152,8 @@ function renderForge() {
 
 function renderModalInfo(w) {
   const r = RAR[w.r], sp = spare(w), v = SHARD_VALUE[w.r];
-  $('pvInfo').innerHTML = `<span class="rlabel${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span><h2>${w.name}</h2><p>${w.desc}<br>${state.inv[w.id]}개 보유</p>` +
+  const lv = armLevel(state.inv[w.id]), d = ARMS[w.id];
+  $('pvInfo').innerHTML = `<span class="rlabel${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span><h2>${w.name}</h2><p>${w.desc}<br>${state.inv[w.id]}개 보유 · 전투 Lv.${lv} · ${KIND_NAME[d.kind]} · 공격력 ${Math.round(d.dmg * lvMult(lv))}</p>` +
     (canDismantle(w) ? `<div class="fg-btns">
       <button class="btn" id="dismOne" ${sp ? '' : 'disabled'}>1개 분해 (+${v} 조각)</button>
       <button class="btn" id="dismRest" ${sp > 1 ? '' : 'disabled'}>1개만 남기고 분해${sp > 1 ? ` (+${sp * v} 조각)` : ''}</button>

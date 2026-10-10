@@ -1,14 +1,15 @@
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
 import { SFX } from '../sound.js';
-import { RARITIES, TEST_MODE, MAX_LEVEL, lvl, chanceOf, pct } from '../config.js';
+import { RARITIES, TEST_MODE, MAX_LEVEL, lvl, chanceOf, pct, machineCost } from '../config.js';
 import { WEAPONS } from '../three/weapons.js';
 import { resize } from '../three/effects.js';
-import { pull, upgrading, closeResult, clock, upgradeMachine } from '../gacha.js';
+import { pull, upgrading, closeResult, clock, upgradeMachine, auto, setAuto } from '../gacha.js';
 import { applyMachineTheme } from '../three/machine.js';
 import { renderStudy } from './study.js';
 import { curQ, nextQuestion } from './test.js';
 import { renderDex } from './dex.js';
+import { renderBattle, leaveBattle } from './battle.js';
 
 /* =========================================================
    UI 공통
@@ -16,11 +17,13 @@ import { renderDex } from './dex.js';
 export let currentTab = 'gacha';
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
 export function switchTab(tab) {
+  if (auto.on && tab !== 'gacha') setAuto(false, '자동 뽑기를 멈췄어요');
   if ((pull || upgrading) && tab !== 'gacha') {
     if (upgrading) { toast('기계 업그레이드가 끝나면 이동할 수 있어요.'); return; }
     if (pull.phase === 'show') closeResult(false);
     else { toast('뽑기가 끝나면 이동할 수 있어요.'); return; }
   }
+  if (currentTab === 'battle' && tab !== 'battle') leaveBattle();
   currentTab = tab;
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
@@ -28,6 +31,7 @@ export function switchTab(tab) {
   if (tab === 'test') { if (!curQ) nextQuestion(); else if (!curQ.done) $('ans').focus(); }
   if (tab === 'study') renderStudy();
   if (tab === 'dex') renderDex();
+  if (tab === 'battle') renderBattle();
 }
 let toastT;
 export function toast(html) { const t = $('toast'); t.innerHTML = html; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -48,20 +52,25 @@ export function gainCoin(fromEl) {
   document.body.appendChild(s); setTimeout(() => s.remove(), 1000);
   SFX.coin();
 }
-// 뽑기 화면 왼쪽 위: 지금 기계 레벨, 모은 개수, 확률표
+// 뽑기 화면 왼쪽 위: 지금 기계 레벨, 다음 업그레이드 가격, 확률표
 export function renderOdds() {
   const next = state.level < MAX_LEVEL
-    ? `이 기계에서 ${state.got.length}/${WEAPONS.length}종 모음`
-    : '마지막 기계예요';
+    ? `조각 ${state.shards}/${machineCost()}개로 업그레이드 (도감 탭)`
+    : '최고 단계 기계예요';
   $('odds').innerHTML = `<div class="lv">Lv.${state.level} ${lvl().name}<small>${next}</small>${state.luck ? `<small class="luck">행운 ${state.luck}단계 적용 중</small>` : ''}</div>` +
     [...RARITIES].reverse().map(r => `<div class="orow"><span><i style="background:${r.color}"></i>${r.name}</span><span>${pct(chanceOf(r.key))}%</span></div>`).join('') +
-    (TEST_MODE ? '<div class="testbar"><button id="tUp">테스트: 기계 업그레이드</button><button id="tReset">1레벨로</button></div>' : '');
+    (TEST_MODE ? '<div class="testbar"><button id="tUp">테스트: 기계 업그레이드</button><button id="tReset">1레벨로</button><button id="tShard">조각 +100</button><button id="tAll">무기 전부 열기</button></div>' : '');
   if (!TEST_MODE) return;
   $('tUp').onclick = () => upgradeMachine();
   $('tReset').onclick = () => {
     if (pull || upgrading) return;
-    state.level = 1; state.got = []; save();
+    state.level = 1; save();
     applyMachineTheme(1); renderOdds();
+  };
+  $('tShard').onclick = () => { state.shards += 100; save(); renderOdds(); };
+  $('tAll').onclick = () => {
+    WEAPONS.forEach(w => { state.inv[w.id] = Math.max(1, state.inv[w.id] || 0); });
+    save(); toast(`무기 ${WEAPONS.length}종을 전부 열었어요`);
   };
 }
 export function speak(text) {

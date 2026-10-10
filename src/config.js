@@ -13,19 +13,20 @@ export const RARITIES = [
 ];
 export const RAR = Object.fromEntries(RARITIES.map((r, i) => [r.key, { ...r, rank: i }]));
 
-// 뽑기 기계 레벨. 지금 기계에서 무기를 전부 뽑으면 다음 기계로 업그레이드되고,
-// 기계가 좋아질수록 높은 등급은 더 안 나온다 (확률 합계는 항상 100)
+// 뽑기 기계 레벨. 조각으로 업그레이드하고, 기계가 좋아질수록 높은 등급이 더 잘 나온다
+// (희귀 확률은 oddsNow에서 나머지로 계산되므로 합계는 항상 100)
 export const LEVELS = [
-  { name: '기본 머신',   color: '#ffc83d', odds: { ultra: 1,   legend: 4,   hero: 12,  super: 28,    rare: 55 } },
-  { name: '블루 머신',   color: '#5cc8ff', odds: { ultra: .6,  legend: 3,   hero: 9,   super: 27.4,  rare: 60 } },
-  { name: '로열 머신',   color: '#c77dff', odds: { ultra: .3,  legend: 2,   hero: 7,   super: 25.7,  rare: 65 } },
-  { name: '골드 머신',   color: '#ffd860', odds: { ultra: .15, legend: 1.2, hero: 5,   super: 23.65, rare: 70 } },
-  { name: '코스믹 머신', color: '#ff7ad9', odds: { ultra: .05, legend: .6,  hero: 3.5, super: 20.85, rare: 75 } },
+  { name: '기본 머신',   color: '#ffc83d', cost: 20,  odds: { ultra: .5,  legend: 2.5, hero: 9,  super: 28 } },
+  { name: '블루 머신',   color: '#5cc8ff', cost: 45,  odds: { ultra: .8,  legend: 3.5, hero: 11, super: 30 } },
+  { name: '로열 머신',   color: '#c77dff', cost: 80,  odds: { ultra: 1.2, legend: 5,   hero: 14, super: 31 } },
+  { name: '골드 머신',   color: '#ffd860', cost: 130, odds: { ultra: 1.8, legend: 7,   hero: 17, super: 32 } },
+  { name: '코스믹 머신', color: '#ff7ad9',            odds: { ultra: 2.5, legend: 9,   hero: 20, super: 33 } },
 ];
 export const MAX_LEVEL = LEVELS.length;
 export const lvl = () => LEVELS[Math.min(state.level, MAX_LEVEL) - 1];
+export const machineCost = () => lvl().cost; // 다음 기계로 가는 데 드는 조각
 
-// 분해와 행운: 남는 희귀/초희귀를 분해하면 조각이 나오고, 조각으로 행운을 올리면
+// 분해와 행운: 남는 희귀/초희귀를 분해하거나 전투에서 적을 잡으면 조각이 나오고, 조각으로 행운을 올리면
 // 높은 등급 확률이 조금씩 오른다 (오른 만큼 희귀 확률이 줄어듦)
 export const SHARD_VALUE = { rare: 1, super: 2 };           // 1개 분해할 때 나오는 조각
 export const LUCK_MAX = 10;

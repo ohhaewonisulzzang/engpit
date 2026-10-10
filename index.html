@@ -15,6 +15,7 @@
   <a class="logo" aria-label="engpit"><span>engp</span><span class="li">ı<i class="cap"></i></span><span>t</span></a>
   <nav class="tabs">
     <button data-tab="gacha" class="active">뽑기</button>
+    <button data-tab="battle">전투</button>
     <button data-tab="study">단어 외우기</button>
     <button data-tab="test">단어 테스트</button>
     <button data-tab="dex">도감</button>
@@ -33,6 +34,18 @@
       <div class="odds" id="odds"></div>
       <div class="flash" id="flash"></div>
       <div class="banner" id="banner"></div>
+      <div class="autobox">
+        <button class="btn" id="autoBtn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg><b>자동 뽑기</b></button>
+        <label>멈춤 조건
+          <select id="autoStop">
+            <option value="">멈추지 않음</option>
+            <option value="hero">영웅 이상</option>
+            <option value="legend">레전더리 이상</option>
+            <option value="ultra">울트라</option>
+          </select>
+        </label>
+        <label class="chk"><input type="checkbox" id="autoDism">남는 희귀·초희귀 바로 분해</label>
+      </div>
       <div class="pullbar" id="pullbar">
         <button class="pull" id="pullBtn"><b>뽑기</b><small><i class="ci"></i>1</small></button>
         <div class="hint" id="pullHint"></div>
@@ -48,6 +61,31 @@
           <span class="tip">드래그해서 돌려보기</span>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- 전투 -->
+  <section id="tab-battle" class="tab">
+    <div id="arena">
+      <canvas id="bcv"></canvas>
+      <div class="bhud" id="bhud" hidden>
+        <div class="bh-left">
+          <div class="hpbar"><i id="bHp"></i><span id="bHpT"></span></div>
+          <div class="bh-wave"><b id="bWave"></b><span id="bTime"></span></div>
+        </div>
+        <div class="bossbar" id="bBoss" hidden><span id="bBossName"></span><div class="bar"><i id="bBossHp"></i></div></div>
+        <div class="bh-right">
+          <span title="이번 판에서 모은 조각"><i class="si"></i><b id="bShards">0</b></span>
+          <span>처치 <b id="bKills">0</b></span>
+          <button class="bpause" id="bPauseBtn" aria-label="일시정지"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+        </div>
+      </div>
+      <div class="bbanner" id="bBanner"></div>
+
+      <div class="bpanel show" id="bLobby"></div>
+      <div class="bpanel" id="bPerk"></div>
+      <div class="bpanel" id="bPause"></div>
+      <div class="bpanel" id="bEnd"></div>
     </div>
   </section>
 

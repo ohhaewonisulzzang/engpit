@@ -2,6 +2,7 @@
 import './ui/study.js';
 import './ui/test.js';
 import './ui/dex.js';
+import './ui/battle.js';
 import { state } from './state.js';
 import { loop } from './gacha.js';
 import { applyMachineTheme } from './three/machine.js';

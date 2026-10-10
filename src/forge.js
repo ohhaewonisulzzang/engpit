@@ -1,11 +1,12 @@
 import { state, save } from './state.js';
-import { SHARD_VALUE, LUCK_MAX, luckCost } from './config.js';
+import { SHARD_VALUE, LUCK_MAX, luckCost, MAX_LEVEL, machineCost } from './config.js';
 import { WEAPONS } from './three/weapons.js';
 
 /* =========================================================
-   분해와 행운
+   분해와 조각 업그레이드
    - 희귀/초희귀는 1개(도감용)만 남기고 나머지를 분해해서 조각으로 바꿀 수 있다
    - 조각으로 행운을 올리면 모든 기계에서 좋은 등급 확률이 조금씩 오른다
+   - 조각으로 뽑기 기계를 업그레이드하면 좋은 등급 확률이 크게 오른다
    ========================================================= */
 export const canDismantle = w => w.r in SHARD_VALUE;
 export const spare = w => canDismantle(w) ? Math.max(0, (state.inv[w.id] || 0) - 1) : 0;
@@ -27,5 +28,13 @@ export const nextLuckCost = () => luckCost(state.luck);
 export function buyLuck() {
   if (luckMaxed() || state.shards < nextLuckCost()) return false;
   state.shards -= nextLuckCost(); state.luck++; save();
+  return true;
+}
+
+export const machineMaxed = () => state.level >= MAX_LEVEL;
+// 조각만 내고, 레벨은 뽑기 화면의 업그레이드 연출(upgradeMachine)에서 올린다
+export function payMachine() {
+  if (machineMaxed() || state.shards < machineCost()) return false;
+  state.shards -= machineCost(); save();
   return true;
 }
