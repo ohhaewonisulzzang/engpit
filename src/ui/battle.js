@@ -46,7 +46,6 @@ export function renderBattle() {
       <b>${w.name}</b><small>Lv.${armLevel(state.inv[w.id])} · ${KIND_NAME[ARMS[w.id].kind]}${galaxyOn(w.id) ? ' · ✦' : ''}</small></button>`;
   };
   $('bLobby').innerHTML = `<div class="bl-box">
-    <div class="modenav seg"><button data-tab="battle" class="on">일반 전투</button><button data-tab="pvp">경쟁전</button></div>
     <div class="bl-head">
       <div><h2>전투</h2><p>뽑은 무기로 몰려오는 적을 버텨요. ${WAVE_LEN}초를 버티면 보스가 나오고, 보스를 잡으면 효과를 하나 골라 더 강해져요. 적이 떨어뜨린 <i class="si"></i>조각으로 행운과 뽑기 기계를 업그레이드할 수 있어요.</p></div>
       <div class="bl-best"><b>${best ? best.wave : 0}</b>최고 웨이브</div>

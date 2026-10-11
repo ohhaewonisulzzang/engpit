@@ -11,7 +11,6 @@ import { curQ, nextQuestion } from './test.js';
 import { renderDex } from './dex.js';
 import { renderBattle, leaveBattle } from './battle.js';
 import { renderRanking, renderLogin } from './ranking.js';
-import { renderPvp, pvpBusy } from './pvp.js';
 
 /* =========================================================
    UI 공통
@@ -19,19 +18,18 @@ import { renderPvp, pvpBusy } from './pvp.js';
    - 위쪽 메뉴의 "단어"는 study/test 중 마지막에 본 화면으로 간다 (단어 탭 안에서 둘을 오감)
    ========================================================= */
 export let currentTab = 'gacha';
-let wordTab = 'study', battleTab = 'battle', backTab = 'gacha';
-const NAV_OF = { study: 'word', test: 'word', pvp: 'battle', login: null };
+let wordTab = 'study', backTab = 'gacha';
+const NAV_OF = { study: 'word', test: 'word', login: null };
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-tab]'); if (!b) return;
   const t = b.dataset.tab;
-  // 위쪽 메뉴의 단어·전투는 마지막에 본 화면으로 (단어: 외우기/테스트, 전투: 일반/경쟁전)
-  switchTab(t === 'word' ? wordTab : t === 'battle' && b.closest('.tabs') ? battleTab : t);
+  // 위쪽 메뉴의 단어는 외우기/테스트 중 마지막에 본 화면으로
+  switchTab(t === 'word' ? wordTab : t);
 });
 $('acctBtn').onclick = () => switchTab('login');
 // 로그인 화면을 닫으면 원래 보던 화면으로
 export const leaveLogin = () => switchTab(backTab === 'login' ? 'rank' : backTab);
 export function switchTab(tab) {
-  if (pvpBusy() && tab !== 'pvp') { toast('경쟁전 경기 중에는 다른 화면으로 갈 수 없어요'); return; }
   if (auto.on && tab !== 'gacha') setAuto(false, '자동 뽑기를 멈췄어요');
   if ((pull || upgrading) && tab !== 'gacha') {
     if (upgrading) { toast('기계 업그레이드가 끝나면 이동할 수 있어요.'); return; }
@@ -41,11 +39,10 @@ export function switchTab(tab) {
   if (currentTab === 'battle' && tab !== 'battle') leaveBattle();
   if (tab === 'login' && currentTab !== 'login') backTab = currentTab;
   if (tab === 'study' || tab === 'test') wordTab = tab;
-  if (tab === 'battle' || tab === 'pvp') battleTab = tab;
   currentTab = tab;
   const nav = tab in NAV_OF ? NAV_OF[tab] : tab;
   document.querySelectorAll('.tabs [data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === nav));
-  document.querySelectorAll('.wordnav [data-tab], .modenav [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  document.querySelectorAll('.wordnav [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   $('acctBtn').classList.toggle('active', tab === 'login');
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
   document.querySelector('main').scrollTop = 0;
@@ -56,7 +53,6 @@ export function switchTab(tab) {
   if (tab === 'battle') renderBattle();
   if (tab === 'rank') renderRanking();
   if (tab === 'login') renderLogin();
-  if (tab === 'pvp') renderPvp();
 }
 let toastT;
 export function toast(html) { const t = $('toast'); t.innerHTML = html; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
