@@ -3,6 +3,13 @@ import { state } from './state.js';
 // 테스트 모드(코인 무한, 테스트용 버튼): 개발 서버(npm run dev)에서만 켜지고 배포판에서는 꺼짐
 export const TEST_MODE = import.meta.env.DEV;
 
+// 월간 조각 랭킹 서버 (Supabase). 비어 있으면 랭킹 탭에서 "서버 설정 필요"라고 보여 준다
+// anon 키는 브라우저에 공개돼도 되는 키라서 코드에 그대로 넣는다 (쓰기는 supabase/ranking.sql의 함수로만 가능)
+export const RANKING = {
+  url: 'https://gbqryhbmysnmnnachtrz.supabase.co', // 예: 'https://abcd1234.supabase.co'
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdicXJ5aGJteXNubW5uYWNodHJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MjUwOTAsImV4cCI6MjEwNzMwMTA5MH0.xthss76UMUm82twQYmkTbY5wJcxO-XzHAI3BOOpeY6Q', // 프로젝트 설정 → API → anon public 키
+};
+
 // 등급 (낮은 등급 → 높은 등급)
 export const RARITIES = [
   { key: 'rare',   name: '희귀',     color: '#9aa38f', hex: 0x9aa38f, banner: '희귀' },
@@ -13,18 +20,22 @@ export const RARITIES = [
 ];
 export const RAR = Object.fromEntries(RARITIES.map((r, i) => [r.key, { ...r, rank: i }]));
 
-// 뽑기 기계 레벨. 조각으로 업그레이드하고, 기계가 좋아질수록 높은 등급이 더 잘 나온다
+// 뽑기 기계 레벨. 조각으로 업그레이드하면 높은 등급 확률은 점점 낮아지지만,
+// 기계 전용 칼(무기의 m)이 생긴다. 전용 칼은 m 레벨 이상의 기계에서 뽑힌다
 // (희귀 확률은 oddsNow에서 나머지로 계산되므로 합계는 항상 100)
+// 갤럭시 파워가 전투 Lv.11(같은 무기 11개)부터라서 높은 등급(영웅·레전더리·울트라)을 기계마다 합쳐서 3%p 올려 둠
 export const LEVELS = [
-  { name: '기본 머신',   color: '#ffc83d', cost: 20,  odds: { ultra: .5,  legend: 2.5, hero: 9,  super: 28 } },
-  { name: '블루 머신',   color: '#5cc8ff', cost: 45,  odds: { ultra: .8,  legend: 3.5, hero: 11, super: 30 } },
-  { name: '로열 머신',   color: '#c77dff', cost: 80,  odds: { ultra: 1.2, legend: 5,   hero: 14, super: 31 } },
-  { name: '골드 머신',   color: '#ffd860', cost: 130, odds: { ultra: 1.8, legend: 7,   hero: 17, super: 32 } },
-  { name: '코스믹 머신', color: '#ff7ad9',            odds: { ultra: 2.5, legend: 9,   hero: 20, super: 33 } },
+  { name: '기본 머신',   color: '#ffc83d', cost: 20,  odds: { ultra: 1,   legend: 3.5, hero: 10.5, super: 28 } },
+  { name: '블루 머신',   color: '#5cc8ff', cost: 45,  odds: { ultra: .92, legend: 3.2, hero: 9.5,  super: 26 } },
+  { name: '로열 머신',   color: '#c77dff', cost: 80,  odds: { ultra: .85, legend: 2.9, hero: 8.5,  super: 24 } },
+  { name: '골드 머신',   color: '#ffd860', cost: 130, odds: { ultra: .78, legend: 2.6, hero: 7.5,  super: 22 } },
+  { name: '코스믹 머신', color: '#ff7ad9',            odds: { ultra: .7,  legend: 2.3, hero: 6.5,  super: 20 } },
 ];
 export const MAX_LEVEL = LEVELS.length;
 export const lvl = () => LEVELS[Math.min(state.level, MAX_LEVEL) - 1];
 export const machineCost = () => lvl().cost; // 다음 기계로 가는 데 드는 조각
+// 뽑힌 등급에 지금 기계로 뽑을 수 있는 전용 칼이 있으면 이 확률로 전용 칼이 나온다
+export const EXCLUSIVE_CHANCE = .4;
 
 // 분해와 행운: 남는 희귀/초희귀를 분해하거나 전투에서 적을 잡으면 조각이 나오고, 조각으로 행운을 올리면
 // 높은 등급 확률이 조금씩 오른다 (오른 만큼 희귀 확률이 줄어듦)

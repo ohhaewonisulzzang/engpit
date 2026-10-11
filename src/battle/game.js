@@ -4,7 +4,7 @@ import { tone, SFX } from '../sound.js';
 import { RAR } from '../config.js';
 import { WEAPONS } from '../three/weapons.js';
 import { sprite } from '../ui/dex.js';
-import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg } from './data.js';
+import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg, galaxyOn } from './data.js';
 
 /* =========================================================
    전투 (탕탕특공대식 핵앤슬래시)
@@ -57,6 +57,15 @@ export function startRun(ids) {
     cam: { x: 0, y: 0 },
   };
   G.arms = (ids.length ? ids : ['fists']).map(makeArm);
+  // 갤럭시 파워 중 캐릭터 전체에 붙는 것 (이동 속도, 재생, 보호막, 반사)
+  for (const a of G.arms) {
+    const g = a.gp; if (!g) continue;
+    if (g.fx === 'swift') G.mods.speed += g.v;
+    if (g.fx === 'regen') G.mods.regen += g.v;
+    if (g.fx === 'shield') G.shieldPct = Math.max(G.shieldPct || 0, g.v);
+    if (g.fx === 'thorns') G.thorns = (G.thorns || 0) + g.v;
+  }
+  G.shieldT = 0; G.p.shield = 0;
   if (!W) fit();
   waveStart();
   hooks.banner?.('웨이브 1', '#ffc83d');
@@ -66,8 +75,16 @@ function makeArm(id) {
   return {
     id, w, d: ARMS[id], lv: w ? armLevel(state.inv[id]) : 1,
     col: w ? RAR[w.r].color : '#f3efe6', img: w ? sprite(w) : null,
-    cd: Math.random() * .4, ang: Math.random() * TAU, hits: new WeakMap(),
+    cd: Math.random() * .4, ang: Math.random() * TAU, hits: new WeakMap(), gp: galaxyOn(id),
   };
+}
+// 무기별 능력치: 웨이브 효과에 그 무기의 갤럭시 파워를 더한 것
+function modsFor(a) {
+  const m = G.mods, g = a.gp; if (!g) return m;
+  const f = g.fx, v = g.v;
+  return { ...m,
+    atk: m.atk * (f === 'power' ? 1 + v : 1), area: m.area * (f === 'reach' ? 1 + v : 1),
+    haste: m.haste * (f === 'quick' ? 1 + v : 1), proj: m.proj + (f === 'multi' ? v : 0), crit: m.crit + (f === 'crit' ? v : 0) };
 }
 export function setPaused(v) {
   if (!G || !['fight', 'boss', 'clear'].includes(G.phase) || G.paused === v) return;
@@ -218,9 +235,17 @@ function hurt(e, v, crit, kx = 0, ky = 0) {
   if (e.hp <= 0) kill(e);
 }
 function strike(e, a, kx, ky) {
-  const crit = Math.random() < G.mods.crit;
+  const m = modsFor(a), g = a.gp, crit = Math.random() < m.crit;
   if (a.d.slow) e.slowT = 1.5;
-  hurt(e, a.d.dmg * lvMult(a.lv) * G.mods.atk * (crit ? 2 : 1), crit, kx, ky);
+  let v = a.d.dmg * lvMult(a.lv) * m.atk * (crit ? 2 : 1);
+  if (g) { // 갤럭시 파워: 맞을 때 효과
+    if (g.fx === 'execute' && e.hp < e.maxHp * .4) v *= 1 + g.v;
+    if (g.fx === 'burn') { e.burnDps = Math.max(e.burnT > 0 ? e.burnDps : 0, v * g.v / 2); e.burnT = 2; }
+    if (g.fx === 'slow') e.slowT = 1.5;
+    if (g.fx === 'stun' && Math.random() < g.v) e.stunT = .6;
+    if (g.fx === 'leech') G.p.hp = Math.min(G.p.maxHp, G.p.hp + v * g.v * .25);
+  }
+  hurt(e, v, crit, kx, ky);
 }
 function kill(e) {
   e.dead = true; G.kills++;
@@ -233,17 +258,19 @@ function kill(e) {
   } else if (Math.random() < e.drop) drop(e.x, e.y, 'shard', 1, 80);
   else if (Math.random() < .015) drop(e.x, e.y, 'heart', 0, 60);
 }
-function hitPlayer(v) {
+function hitPlayer(v, src) {
   const p = G.p;
   if (p.inv > 0 || G.phase === 'over' || G.phase === 'clear') return;
   v = Math.max(1, v - G.mods.armor);
+  if (G.thorns && src && !src.dead) hurt(src, v * G.thorns * 3, false); // 갤럭시 파워: 반사
+  if (p.shield > 0) { const s = Math.min(p.shield, v); p.shield -= s; v -= s; if (v <= 0) { p.inv = .6; text(p.x, p.y - 24, '막음', '#8adfff'); return; } }
   p.hp -= v; p.inv = .6; p.hurt = .25; G.shake = Math.max(G.shake, .25);
   text(p.x, p.y - 24, Math.round(v), '#ff6b6b');
   tone(150, .18, 'sawtooth', .07, 0, 70);
   if (p.hp <= 0) { p.hp = 0; gameOver(false); }
 }
 function explode(x, y, a) {
-  const R = a.d.explode * G.mods.area;
+  const R = a.d.explode * modsFor(a).area;
   for (const e of G.enemies) if (!e.dead && Math.hypot(e.x - x, e.y - y) < R + e.r) strike(e, a, 0, 0);
   ring(x, y, 10, R, '#ff8a3d', .3); puff(x, y, '#ffb020', 14, 160);
   tone(120, .15, 'sawtooth', .04, 0, 60);
@@ -265,10 +292,10 @@ function nearest(maxD) {
 function shoot(a, ang, o = {}) {
   const d = a.d;
   G.shots.push({ a, x: G.p.x, y: G.p.y, vx: Math.cos(ang) * d.speed, vy: Math.sin(ang) * d.speed, t: 0,
-    life: o.life ?? (d.boomerang ? 2.2 : 1.4), pierce: o.pierce ?? d.pierce, hit: new Set(), r: d.size * .4 * G.mods.area });
+    life: o.life ?? (d.boomerang ? 2.2 : 1.4), pierce: o.pierce ?? d.pierce, hit: new Set(), r: d.size * .4 * modsFor(a).area });
 }
 function updateArm(a, dt) {
-  const d = a.d, p = G.p, m = G.mods;
+  const d = a.d, p = G.p, m = modsFor(a);
   if (d.kind === 'orbit') {
     const n = d.count + m.proj, R = d.radius * m.area, hr = d.size * .35 * m.area;
     a.ang += d.spin * m.haste * dt;
@@ -333,7 +360,7 @@ function updateArm(a, dt) {
     a.cd = d.cd;
     for (let i = 0, n = d.count + m.proj; i < n && near.length; i++) {
       const e = near.splice(Math.floor(Math.random() * near.length), 1)[0], sr = d.splash * m.area;
-      G.fx.push({ type: 'bolt', x: e.x, y: e.y, t: 0, dur: .28, seed: Math.random() * 99 });
+      G.fx.push({ type: 'bolt', x: e.x, y: e.y, t: 0, dur: .28, seed: Math.random() * 99, col: d.col });
       for (const o of G.enemies) if (!o.dead && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < (sr + o.r) ** 2) strike(o, a, 0, 0);
       puff(e.x, e.y, '#cff4ff', 8, 140);
     }
@@ -415,6 +442,7 @@ function update(dt) {
   if (l > .1) { p.face = Math.atan2(my, mx); p.walk += dt * 12; }
   p.inv -= dt; p.hurt -= dt;
   if (m.regen) { G.regenT += dt; if (G.regenT >= 1) { G.regenT -= 1; p.hp = Math.min(p.maxHp, p.hp + m.regen); } }
+  if (G.shieldPct) { G.shieldT -= dt; if (G.shieldT <= 0) { G.shieldT = 8; p.shield = Math.max(p.shield, p.maxHp * G.shieldPct); } }
 
   // 웨이브 진행
   if (G.phase === 'fight') { G.waveT += dt; if (G.waveT >= WAVE_LEN) spawnBoss(); }
@@ -441,6 +469,12 @@ function update(dt) {
   const far = viewR() * 1.7;
   for (const e of G.enemies) {
     if (e.dead) continue;
+    if (e.burnT > 0) { // 갤럭시 파워: 불·독
+      e.burnT -= dt; e.hp -= e.burnDps * dt; e.burnTick = (e.burnTick || 0) - dt;
+      if (e.burnTick <= 0) { e.burnTick = .5; text(e.x, e.y - e.r, Math.round(e.burnDps / 2), '#ff9a3d'); }
+      if (e.hp <= 0) { kill(e); continue; }
+    }
+    if (e.stunT > 0) { e.stunT -= dt; e.flash -= dt; continue; }
     if (e.boss) updateBoss(e, dt);
     else {
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
@@ -465,7 +499,7 @@ function update(dt) {
     e.x += e.kx * dt; e.y += e.ky * dt;
     const decay = Math.max(0, 1 - dt * 9); e.kx *= decay; e.ky *= decay;
     e.flash -= dt; e.slowT -= dt;
-    if (!(e.z > 20) && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (e.r + p.r - 3) ** 2) hitPlayer(e.dmg);
+    if (!(e.z > 20) && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (e.r + p.r - 3) ** 2) hitPlayer(e.dmg, e);
   }
   // 적끼리 밀어내기
   const es = G.enemies;
@@ -603,6 +637,8 @@ function drawEnemy(e) {
     ctx.moveTo(-w, cy); ctx.lineTo(-w, cy - 14); ctx.lineTo(-w / 2, cy - 6); ctx.lineTo(0, cy - 18); ctx.lineTo(w / 2, cy - 6); ctx.lineTo(w, cy - 14); ctx.lineTo(w, cy); ctx.fill();
   }
   ctx.restore();
+  if (e.stunT > 0) { ctx.fillStyle = '#ffe14a'; ctx.font = '700 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('✦✦', e.x, e.y - z - r - 6); }
+  if (e.burnT > 0) { ctx.globalAlpha = .35; circle(e.x, e.y - z, r + 4, '#ff7a20'); ctx.globalAlpha = 1; }
   if (e.slowT > 0) { ctx.strokeStyle = 'rgba(140,220,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y - z, r + 3, 0, TAU); ctx.stroke(); }
   if (!e.boss && e.hp < e.maxHp && e.maxHp > 40) {
     ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(e.x - r, e.y + r + 4, r * 2, 4);
@@ -634,6 +670,7 @@ function drawPlayer(p) {
   const ox = Math.cos(p.face) * 4, oy = Math.sin(p.face) * 3;
   circle(-4 + ox, 5 + oy, 2.2, '#14161c'); circle(4 + ox, 5 + oy, 2.2, '#14161c');
   ctx.restore();
+  if (p.shield > 0) { ctx.strokeStyle = 'rgba(138,223,255,.8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y - bob, p.r + 6, 0, TAU); ctx.stroke(); }
 }
 function drawImg(a, x, y, ang, L, centered) {
   if (a.img?.complete && a.img.naturalWidth) {
@@ -642,10 +679,10 @@ function drawImg(a, x, y, ang, L, centered) {
   } else circle(x + Math.cos(ang) * L * .7, y + Math.sin(ang) * L * .7, centered ? L * .3 : 7, '#f3efe6');
 }
 function drawArms() {
-  const p = G.p, m = G.mods;
+  const p = G.p;
   for (const a of G.arms) {
     if (a.d.kind !== 'orbit') continue;
-    const n = a.d.count + m.proj, R = a.d.radius * m.area, L = a.d.size * m.area;
+    const m = modsFor(a), n = a.d.count + m.proj, R = a.d.radius * m.area, L = a.d.size * m.area;
     for (let i = 0; i < n; i++) {
       const an = a.ang + i / n * TAU, x = p.x + Math.cos(an) * R, y = p.y + Math.sin(an) * R;
       ctx.globalAlpha = .25; circle(x, y, L * .4, a.col); ctx.globalAlpha = 1;
@@ -678,7 +715,7 @@ function drawShots() {
     }
     if (d.stone) { circle(s.x, s.y, s.r + 2, '#7d7768'); circle(s.x - 1, s.y - 1, s.r * .5, '#a9a291'); continue; }
     if (d.fire) { ctx.globalAlpha = .4; circle(s.x, s.y, s.r * 2.4, '#ff6a3d'); ctx.globalAlpha = 1; circle(s.x, s.y, s.r * 1.2, '#ffc83d'); circle(s.x, s.y, s.r * .6, '#fff6d8'); continue; }
-    const L = d.size * G.mods.area;
+    const L = d.size * modsFor(s.a).area;
     if (d.kind === 'nova') { ctx.globalAlpha = .3; circle(s.x, s.y, L * .4, `hsl(${(G.t * 300 + s.x) % 360},100%,65%)`); ctx.globalAlpha = 1; }
     drawImg(s.a, s.x, s.y, d.spinning ? s.t * 16 : Math.atan2(s.vy, s.vx), L, true);
   }
@@ -733,7 +770,7 @@ function draw() {
   }
   for (const f of G.fx) if (f.type === 'bolt') { // 번개
     const u = f.t / f.dur; let x = f.x, y = f.y - 320;
-    ctx.globalAlpha = 1 - u; ctx.strokeStyle = '#cff4ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.globalAlpha = 1 - u; ctx.strokeStyle = f.col || '#cff4ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y);
     for (let i = 1; i <= 8; i++) { y = f.y - 320 + i * 40; x = f.x + (i < 8 ? Math.sin(f.seed + i * 2.7) * 22 : 0); ctx.lineTo(x, y); }
     ctx.stroke(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.globalAlpha = (1 - u) * .5; circle(f.x, f.y, 30, '#9adcff'); ctx.globalAlpha = 1;

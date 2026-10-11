@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { $ } from './dom.js';
 import { state, save } from './state.js';
-import { RARITIES, RAR, TEST_MODE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE } from './config.js';
+import { RARITIES, RAR, TEST_MODE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE } from './config.js';
 import { ac, SFX } from './sound.js';
 import { V3, glow, disposeObj, U } from './three/helpers.js';
 import { buildWeapon, WEAPONS } from './three/weapons.js';
@@ -37,7 +37,10 @@ export function startPull() {
   if (!TEST_MODE) state.coins--;
   state.pulls++;
   const rar = rollRarity();
-  const pool = WEAPONS.filter(w => w.r === rar.key), w = pool[Math.floor(Math.random() * pool.length)];
+  // 지금 기계 레벨 이하의 전용 칼이 그 등급에 있으면 EXCLUSIVE_CHANCE 확률로 전용 칼, 아니면 일반 무기
+  const ex = WEAPONS.filter(w => w.m && w.m <= state.level && w.r === rar.key);
+  const pool = ex.length && Math.random() < EXCLUSIVE_CHANCE ? ex : WEAPONS.filter(w => !w.m && w.r === rar.key);
+  const w = pool[Math.floor(Math.random() * pool.length)];
   const isNew = !state.inv[w.id];
   state.inv[w.id] = (state.inv[w.id] || 0) + 1;
   // 처음 뽑은 무기는 전투 장착 칸이 비어 있으면 바로 장착
@@ -238,6 +241,8 @@ function autoNext(p) {
   auto.timer = setTimeout(() => { if (auto.on && pull?.phase === 'show') closeResult(true); }, 900);
 }
 $('autoBtn').onclick = () => setAuto(!auto.on);
+// 좁은 화면에서는 자동 뽑기 설정이 접혀 있다
+$('autoOpt').onclick = () => $('autoOpt').closest('.autobox').classList.toggle('open');
 $('autoStop').value = auto.stop;
 $('autoStop').onchange = e => { auto.stop = e.target.value; saveAuto(); };
 $('autoDism').checked = auto.dism;
@@ -276,7 +281,7 @@ function updateUpgrade(dt) {
   } else if (u.t >= 4) {
     $('banner').className = 'banner';
     upgrading = null; $('pullBtn').disabled = false; $('pullbar').style.opacity = 1;
-    toast(`Lv.${state.level} ${lvl().name}: 좋은 등급이 더 잘 나와요!`);
+    toast(`Lv.${state.level} ${lvl().name}: 이제부터 전용 칼 3종이 더 나와요!`);
     u.done?.();
   }
 }

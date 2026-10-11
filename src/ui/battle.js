@@ -5,8 +5,10 @@ import { SFX } from '../sound.js';
 import { WEAPONS } from '../three/weapons.js';
 import { thumb } from './dex.js';
 import { toast } from './common.js';
+import { galaxyHTML, bindGalaxy } from './galaxy.js';
+import { submitWave, session, rankReady } from '../ranking.js';
 import { G, hooks, startRun, choosePerk, setPaused, quitRun, clearRun } from '../battle/game.js';
-import { ARMS, KIND_NAME, MAX_EQUIP, PERKS, WAVE_LEN, armLevel, lvMult } from '../battle/data.js';
+import { ARMS, KIND_NAME, MAX_EQUIP, PERKS, WAVE_LEN, MAX_ARM_LV, armLevel, lvMult, galaxyOn } from '../battle/data.js';
 
 /* =========================================================
    전투 화면: 무기 장착(로비), HUD, 웨이브 효과 고르기, 결과
@@ -31,30 +33,34 @@ export function renderBattle() {
   const slot = id => {
     if (!id) return '<div class="slot empty"><span>빈 칸</span></div>';
     const w = byId(id);
-    return `<button class="slot" style="--rc:${RAR[w.r].color}" data-un="${id}"><img src="${thumb(w, true)}" alt="">
-      <div><b>${w.name}</b><small>전투 Lv.${armLevel(state.inv[id])} · ${KIND_NAME[ARMS[id].kind]} · 공격력 ${power(id)}</small></div><span class="out">빼기</span></button>`;
+    // 장착 칸: 무기 정보 + 갤럭시 파워 착용/해금
+    return `<div class="slot" style="--rc:${RAR[w.r].color}"><div class="slot-main"><img src="${thumb(w, true)}" alt="">
+      <div><b>${w.name}</b><small>전투 Lv.${armLevel(state.inv[id])} · ${KIND_NAME[ARMS[id].kind]} · 공격력 ${power(id)}</small></div>
+      <button class="out" data-un="${id}" aria-label="${w.name} 빼기">빼기</button></div>${galaxyHTML(w, true)}</div>`;
   };
   const card = w => {
     const on = eq.includes(w.id), r = RAR[w.r];
     return `<button class="acard${on ? ' on' : ''}" style="--rc:${r.color}" data-eq="${w.id}">
       ${on ? '<em>장착 중</em>' : ''}<img src="${thumb(w, true)}" alt="">
       <span class="rl${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span>
-      <b>${w.name}</b><small>Lv.${armLevel(state.inv[w.id])} · ${KIND_NAME[ARMS[w.id].kind]}</small></button>`;
+      <b>${w.name}</b><small>Lv.${armLevel(state.inv[w.id])} · ${KIND_NAME[ARMS[w.id].kind]}${galaxyOn(w.id) ? ' · ✦' : ''}</small></button>`;
   };
   $('bLobby').innerHTML = `<div class="bl-box">
     <div class="bl-head">
       <div><h2>전투</h2><p>뽑은 무기로 몰려오는 적을 버텨요. ${WAVE_LEN}초를 버티면 보스가 나오고, 보스를 잡으면 효과를 하나 골라 더 강해져요. 적이 떨어뜨린 <i class="si"></i>조각으로 행운과 뽑기 기계를 업그레이드할 수 있어요.</p></div>
-      <div class="bl-best"><b>${best ? best.wave : '-'}</b>최고 웨이브</div>
+      <div class="bl-best"><b>${best ? best.wave : 0}</b>최고 웨이브</div>
     </div>
-    <div class="bl-label">장착한 무기 <small>${eq.length}/${MAX_EQUIP}${eq.length ? '' : ' · 비어 있으면 맨주먹으로 싸워요'}</small></div>
+    <div class="bl-label">장착한 무기 <small>${eq.length}/${MAX_EQUIP}${eq.length ? ' · 갤럭시 파워도 여기서 착용할 수 있어요' : ' · 비어 있으면 맨주먹으로 싸워요'}</small></div>
     <div class="slots">${Array.from({ length: MAX_EQUIP }, (_, i) => slot(eq[i])).join('')}</div>
-    <div class="bl-label">가진 무기 <small>같은 무기를 많이 가질수록 전투 레벨이 올라요 (최대 10)</small></div>
+    <div class="bl-label">가진 무기 <small>같은 무기를 많이 가질수록 전투 레벨이 올라요 (최대 ${MAX_ARM_LV})</small></div>
     <div class="armgrid">${owned.length ? owned.map(card).join('') : '<p class="bl-empty">아직 무기가 없어요. 뽑기에서 무기를 뽑아 오세요.</p>'}</div>
     <div class="bl-go"><span>이동: WASD·방향키 또는 화면을 누르고 끌기 · 일시정지: Esc</span><button class="btn primary" id="bStart">출격하기</button></div>
   </div>`;
 }
+bindGalaxy($('bLobby'), renderBattle);
 $('bLobby').onclick = e => {
   if (e.target.closest('#bStart')) return go();
+  if (e.target.closest('[data-gp-buy],[data-gp-toggle]')) return;
   const un = e.target.closest('[data-un]'), eb = e.target.closest('[data-eq]');
   const eq = equipped();
   if (un) state.equip = eq.filter(x => x !== un.dataset.un);
@@ -120,8 +126,13 @@ hooks.end = s => {
   $('bEnd').innerHTML = `<div class="bp-box"><h2>${s.gaveUp ? '전투 종료' : '쓰러졌어요'}</h2>${s.rec ? '<div class="rec">최고 기록!</div>' : ''}
     <div class="end-stats"><div><b>${s.wave}</b>웨이브</div><div><b>${s.kills}</b>처치</div><div><b>${fmt(s.time)}</b>버틴 시간</div><div><b><i class="si"></i>${s.shards}</b>얻은 조각</div></div>
     <p>조각은 도감 탭에서 행운과 뽑기 기계 업그레이드에 쓸 수 있어요.</p>
+    <p class="rk-sent" id="bRank">${rankReady() ? (session ? '랭킹에 기록을 올리는 중…' : '로그인하면 이 기록이 이번 달 랭킹에 올라가요 (랭킹 탭)') : ''}</p>
     <div class="fg-btns center"><button class="btn" id="bToLobby">무기 바꾸기</button><button class="btn primary" id="bRetry">다시 도전</button></div></div>`;
   show('bEnd', true);
+  // 이번 판 결과를 월간 랭킹에 올림 (서버가 이번 달 최고 기록보다 좋을 때만 바꿈)
+  if (session && rankReady()) submitWave(s.wave, s.kills)
+    .then(ok => { if ($('bRank')) $('bRank').textContent = ok ? '랭킹에 기록했어요. 랭킹 탭에서 순위를 확인해 보세요!' : '테스트 모드에서는 랭킹에 올리지 않아요'; })
+    .catch(() => { if ($('bRank')) $('bRank').textContent = '랭킹에 올리지 못했어요 (인터넷 연결 확인)'; });
   $('bRetry').onclick = go;
   $('bToLobby').onclick = () => { show('bEnd', false); clearRun(); renderBattle(); show('bLobby', true); };
 };

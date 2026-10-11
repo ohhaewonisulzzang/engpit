@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { $ } from '../dom.js';
-import { state } from '../state.js';
-import { RAR, RARITIES, MAX_LEVEL, lvl, LEVELS, LUCK_MAX, SHARD_VALUE, chanceOf, pct, machineCost } from '../config.js';
+import { state, save } from '../state.js';
+import { RAR, RARITIES, MAX_LEVEL, LEVELS, LUCK_MAX, SHARD_VALUE, chanceOf, pct, machineCost } from '../config.js';
 import { canDismantle, spare, spareShards, dismantle, dismantleAll, buyLuck, luckMaxed, nextLuckCost, machineMaxed, payMachine } from '../forge.js';
 import { toast, renderOdds, switchTab } from './common.js';
 import { upgradeMachine } from '../gacha.js';
-import { armLevel, ARMS, KIND_NAME, lvMult } from '../battle/data.js';
+import { armLevel, ARMS, KIND_NAME, lvMult, MAX_ARM_LV, galaxyState } from '../battle/data.js';
+import { galaxyHTML, bindGalaxy } from './galaxy.js';
 import { SFX } from '../sound.js';
 import { basic, disposeObj, makeEnv } from '../three/helpers.js';
 import { buildWeapon, WEAPONS } from '../three/weapons.js';
@@ -60,10 +61,10 @@ export function renderDex() {
   $('dexGrid').innerHTML = [...WEAPONS].reverse().map(w => {
     const r = RAR[w.r], n = state.inv[w.id] || 0;
     return `<div class="dcard${n ? ' owned' : ''}" style="--rc:${r.color}" data-id="${w.id}">
-      ${n ? `<span class="cnt">×${n}</span><span class="here">전투 Lv.${armLevel(n)}</span>` : ''}
+      ${n ? `<span class="cnt">×${n}</span><span class="here">전투 Lv.${armLevel(n)}${galaxyState(w) === 'on' ? ' ✦' : ''}</span>` : ''}
       <img src="${thumb(w, !!n)}" alt="">
       <div class="rl${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</div>
-      <div class="nm">${n ? w.name : '아직 못 뽑음'}</div></div>`;
+      <div class="nm">${n ? w.name : '아직 못 뽑음'}</div>${w.m ? `<div class="mtag" style="--mc:${LEVELS[w.m - 1].color}">${LEVELS[w.m - 1].name} 이상</div>` : ''}</div>`;
   }).join('');
 }
 $('dexGrid').onclick = e => {
@@ -111,9 +112,12 @@ const oddsRow = (now, next) => '<div class="fg-odds">' + ['ultra', 'legend', 'he
   `<span style="--rc:${RAR[k].color}"><i class="cap-ic"></i>${RAR[k].name} ${pct(now[k])}% → <b>${pct(next[k])}%</b></span>`).join('') + '</div>';
 function renderMachine() {
   const maxed = machineMaxed(), cost = maxed ? 0 : machineCost();
-  const now = oddsWith(() => () => {}), next = maxed ? now : oddsWith(() => (state.level++, () => state.level--));
+  // 가장 높은 기계와 다음 기계의 확률 비교 (state를 잠깐 바꿔서 계산)
+  const at = lv => () => { const a = state.level; state.level = lv; return () => { state.level = a; }; };
+  const now = oddsWith(at(state.level)), next = maxed ? now : oddsWith(at(state.level + 1));
+  const nextEx = maxed ? [] : WEAPONS.filter(w => w.m === state.level + 1);
   $('lvProg').innerHTML = `<div class="fg-head">
-      <div><b>뽑기 기계 Lv.${state.level} ${lvl().name}</b><p>${maxed ? '최고 단계 기계예요.' : `조각으로 ${LEVELS[state.level].name}로 업그레이드하면 좋은 등급이 훨씬 잘 나와요.`}</p></div>
+      <div><b>뽑기 기계 Lv.${state.level} ${LEVELS[state.level - 1].name}</b><p>${maxed ? '모든 기계를 열었어요. 전용 칼 12종이 모두 나와요.' : `조각으로 ${LEVELS[state.level].name}를 열면 높은 등급 확률은 조금 낮아지지만, 전용 칼 ${nextEx.length}종(${nextEx.map(w => RAR[w.r].name).join('·')})이 새로 나오기 시작해요. 전용 칼은 그 기계 이상이면 계속 나와요.`}</p></div>
       <div class="fg-stats"><div><b>${state.level}<small>/${MAX_LEVEL}</small></b>기계</div></div>
     </div>
     ${maxed ? '' : `<div class="bar"><i style="width:${Math.min(1, state.shards / cost) * 100}%"></i></div>${oddsRow(now, next)}`}
@@ -150,10 +154,14 @@ function renderForge() {
   };
 }
 
+// 상세창이 열려 있는 무기 (갤럭시 파워를 바꾸면 다시 그림)
+let modalW = null;
+bindGalaxy($('pvInfo'), () => { if (modalW) renderModalInfo(modalW); renderDex(); });
 function renderModalInfo(w) {
+  modalW = w;
   const r = RAR[w.r], sp = spare(w), v = SHARD_VALUE[w.r];
   const lv = armLevel(state.inv[w.id]), d = ARMS[w.id];
-  $('pvInfo').innerHTML = `<span class="rlabel${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span><h2>${w.name}</h2><p>${w.desc}<br>${state.inv[w.id]}개 보유 · 전투 Lv.${lv} · ${KIND_NAME[d.kind]} · 공격력 ${Math.round(d.dmg * lvMult(lv))}</p>` +
+  $('pvInfo').innerHTML = `<span class="rlabel${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span><h2>${w.name}</h2><p>${w.desc}<br>${w.m ? `<b style="color:${LEVELS[w.m - 1].color}">${LEVELS[w.m - 1].name} 이상에서 뽑을 수 있어요</b><br>` : ''}${state.inv[w.id]}개 보유 · 전투 Lv.${lv}/${MAX_ARM_LV} · ${KIND_NAME[d.kind]} · 공격력 ${Math.round(d.dmg * lvMult(lv))}</p>` + galaxyHTML(w) +
     (canDismantle(w) ? `<div class="fg-btns">
       <button class="btn" id="dismOne" ${sp ? '' : 'disabled'}>1개 분해 (+${v} 조각)</button>
       <button class="btn" id="dismRest" ${sp > 1 ? '' : 'disabled'}>1개만 남기고 분해${sp > 1 ? ` (+${sp * v} 조각)` : ''}</button>

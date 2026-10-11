@@ -14,17 +14,20 @@
 <header class="top">
   <a class="logo" aria-label="engpit"><span>engp</span><span class="li">ı<i class="cap"></i></span><span>t</span></a>
   <nav class="tabs">
-    <button data-tab="gacha" class="active">뽑기</button>
-    <button data-tab="battle">전투</button>
-    <button data-tab="study">단어 외우기</button>
-    <button data-tab="test">단어 테스트</button>
-    <button data-tab="dex">도감</button>
+    <button data-tab="gacha" class="active"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M6 9h12M8 21h8M12 15v6"/></svg><span>뽑기</span></button>
+    <button data-tab="battle"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg><span>전투</span></button>
+    <button data-tab="word"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M8 7h8M8 11h5"/></svg><span>단어</span></button>
+    <button data-tab="dex"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>도감</span></button>
+    <button data-tab="rank"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg><span>랭킹</span></button>
   </nav>
+  <div class="top-right">
   <button class="mute" id="muteBtn" aria-label="소리 켜기/끄기">
     <svg class="ic on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
     <svg class="ic off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
   </button>
+  <button class="acct" id="acctBtn">로그인</button>
   <div class="coin" id="coinBox" title="보유 코인"><i class="ci"></i><b id="coinNum">0</b></div>
+  </div>
 </header>
 
 <main>
@@ -36,6 +39,8 @@
       <div class="banner" id="banner"></div>
       <div class="autobox">
         <button class="btn" id="autoBtn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg><b>자동 뽑기</b></button>
+        <button class="auto-opt" id="autoOpt" aria-label="자동 뽑기 설정">설정</button>
+        <div class="auto-opts">
         <label>멈춤 조건
           <select id="autoStop">
             <option value="">멈추지 않음</option>
@@ -45,6 +50,7 @@
           </select>
         </label>
         <label class="chk"><input type="checkbox" id="autoDism">남는 희귀·초희귀 바로 분해</label>
+        </div>
       </div>
       <div class="pullbar" id="pullbar">
         <button class="pull" id="pullBtn"><b>뽑기</b><small><i class="ci"></i>1</small></button>
@@ -92,6 +98,7 @@
   <!-- 단어 외우기 -->
   <section id="tab-study" class="tab page">
     <div class="wrap">
+      <div class="wordnav seg"><button data-tab="study">단어 외우기</button><button data-tab="test">단어 테스트</button></div>
       <div class="study-top">
         <div class="seg" id="studySeg"><button data-f="all" class="on">전체</button><button data-f="miss">틀린 단어</button></div>
         <span id="cardPos"></span>
@@ -119,6 +126,7 @@
   <!-- 단어 테스트: 뜻을 보고 영어 단어를 직접 쓴다 -->
   <section id="tab-test" class="tab page">
     <div class="wrap">
+      <div class="wordnav seg"><button data-tab="study">단어 외우기</button><button data-tab="test">단어 테스트</button></div>
       <div class="test-top">
         <span class="fc-cat" id="qCat"></span>
         <div class="streak">연속 정답<b id="streak">0</b><span class="best">최고 <b id="best">0</b></span></div>
@@ -149,6 +157,22 @@
       <div class="forge" id="forge"></div>
       <div class="dex-stats" id="dexStats"></div>
       <div class="dex-grid" id="dexGrid"></div>
+    </div>
+  </section>
+
+  <!-- 로그인 / 회원가입 -->
+  <section id="tab-login" class="tab page">
+    <div class="wrap narrow" id="loginBox"></div>
+  </section>
+
+  <!-- 랭킹: 이번 달 전투 최고 웨이브 -->
+  <section id="tab-rank" class="tab page">
+    <div class="wrap">
+      <div class="rk-head" id="rkHead"></div>
+      <div id="rkAuth"></div>
+      <div id="rkMe"></div>
+      <div id="rkList"></div>
+      <div id="rkPrev"></div>
     </div>
   </section>
 </main>

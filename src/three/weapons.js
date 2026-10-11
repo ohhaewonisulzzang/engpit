@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { NEW_WEAPONS, MACHINE_SWORDS } from './weapons2.js';
 import { V3, srand, rnd, lumpy, uglyMat, std, basic, addBasic, M, stick, extr, poly, roundedBox, glow, sparkles, cosmicMat, voidMat } from './helpers.js';
 
 /* =========================================================
@@ -411,7 +412,7 @@ export function buildWeapon(w, target = 2.2) {
   return outer;
 }
 
-export const WEAPONS = [
+const BASE_WEAPONS = [
   { id: 'stick',  r: 'rare',  name: '썩은 나뭇가지',     desc: '길바닥에 떨어져 있던 것. 이끼 냄새가 난다.', build: bStick },
   { id: 'ladle',  r: 'rare',  name: '찌그러진 국자',     desc: '급식실에서 퇴역한 국자. 국물은 잘 뜬다.', build: bLadle },
   { id: 'dagger', r: 'rare',  name: '녹슨 이빠진 단검',  desc: '파상풍 주사부터 맞고 쓰자.', build: bDagger },
@@ -434,3 +435,6 @@ export const WEAPONS = [
   { id: 'voidreaper', r: 'ultra', name: '차원낫 보이드리퍼', desc: '차원의 틈을 베어 여는 금단의 낫.', build: bReaper },
   { id: 'blackhole', r: 'ultra', name: '사건의 지평선',   desc: '작은 블랙홀을 불러내 모든 것을 빨아들인다.', build: bBlackhole },
 ];
+// 추가 무기를 등급 순서(희귀 → 울트라)에 맞춰 끼워 넣는다
+const ORDER = ['rare', 'super', 'hero', 'legend', 'ultra'];
+export const WEAPONS = [...BASE_WEAPONS, ...NEW_WEAPONS, ...MACHINE_SWORDS].sort((a, b) => ORDER.indexOf(a.r) - ORDER.indexOf(b.r));

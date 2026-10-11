@@ -1,3 +1,5 @@
+import { state } from '../state.js';
+
 /* =========================================================
    전투 데이터: 무기 공격 방식, 적, 보스, 웨이브 효과
    ========================================================= */
@@ -5,7 +7,8 @@ export const MAX_EQUIP = 3;      // 전투에 들고 갈 수 있는 무기 수
 export const WAVE_LEN = 40;      // 웨이브마다 보스가 나오기까지 버티는 시간(초)
 
 // 같은 무기를 여러 개 가질수록 전투 레벨이 올라간다 (분해하면 내려감)
-export const armLevel = n => Math.max(1, Math.min(n || 1, 10));
+export const MAX_ARM_LV = 11;
+export const armLevel = n => Math.max(1, Math.min(n || 1, MAX_ARM_LV));
 export const lvMult = lv => 1 + .12 * (lv - 1);
 
 // kind: swing(앞쪽 휘두르기) | spin(360도 베기) | shot(던지기) | orbit(주위를 돎) | nova(사방으로 발사)
@@ -35,7 +38,148 @@ export const ARMS = {
   thunder:     { kind: 'bolt',  dmg: 34, cd: 1.1, count: 3, range: 380, splash: 45 },
   frostbow:    { kind: 'shot',  dmg: 30, cd: .9,  speed: 620, pierce: 4, count: 3, arrow: true, slow: true, size: 10 },
   blackhole:   { kind: 'zone',  dmg: 20, cd: 3.2, radius: 115, life: 2.6 },
+  // 추가 레전더리
+  tidetrident:   { kind: 'thrust', dmg: 30, cd: .9,  reach: 170, width: 26, slow: true },
+  phoenixbow:    { kind: 'shot',  dmg: 26, cd: .9,  speed: 560, pierce: 2, count: 2, arrow: true, size: 10 },
+  stormblade:    { kind: 'swing', dmg: 30, cd: .8,  reach: 125, arc: 170, knock: 160 },
+  moonsickle:    { kind: 'spin',  dmg: 32, cd: 1.2, reach: 125, knock: 120 },
+  glacierhammer: { kind: 'spin',  dmg: 40, cd: 1.7, reach: 120, knock: 260, slow: true },
+  serpentwhip:   { kind: 'thrust', dmg: 24, cd: .6, reach: 210, width: 14 },
+  starshuriken:  { kind: 'shot',  dmg: 18, cd: .7,  speed: 560, pierce: 1, count: 3, spinning: true, size: 40 },
+  runeorb:       { kind: 'orbit', dmg: 22, count: 4, radius: 95, spin: 4, size: 40 },
+  thornshield:   { kind: 'swing', dmg: 26, cd: .9,  reach: 80, arc: 200, knock: 340 },
+  meteorstaff:   { kind: 'bolt',  dmg: 36, cd: 1.3, count: 2, range: 400, splash: 65, col: '#ff8a3d' },
+  windfan:       { kind: 'nova',  dmg: 22, cd: 1.0, count: 6, speed: 460, size: 44 },
+  crimsonkatana: { kind: 'swing', dmg: 24, cd: .55, reach: 108, arc: 140, knock: 90 },
+  earthgauntlet: { kind: 'swing', dmg: 38, cd: 1.0, reach: 72, arc: 130, knock: 400 },
+  spiritlantern: { kind: 'zone',  dmg: 16, cd: 2.8, radius: 95, life: 2.4 },
+  sunspear:      { kind: 'shot',  dmg: 40, cd: 1.2, speed: 640, pierce: 99, size: 64 },
+  // 추가 울트라
+  galaxybow:     { kind: 'shot',  dmg: 34, cd: .85, speed: 700, pierce: 5, count: 5, arrow: true, size: 10 },
+  chronoblade:   { kind: 'swing', dmg: 48, cd: .8,  reach: 145, arc: 200, knock: 150, slow: true },
+  nebulastaff:   { kind: 'zone',  dmg: 26, cd: 2.6, radius: 140, life: 3 },
+  supernova:     { kind: 'nova',  dmg: 40, cd: 1.3, count: 12, speed: 560, size: 50 },
+  abysstrident:  { kind: 'thrust', dmg: 60, cd: 1.0, reach: 230, width: 32 },
+  zeusspear:     { kind: 'bolt',  dmg: 48, cd: 1.0, count: 4, range: 460, splash: 60 },
+  dragonfang:    { kind: 'spin',  dmg: 58, cd: 1.4, reach: 165, knock: 220 },
+  angelwing:     { kind: 'orbit', dmg: 30, count: 5, radius: 115, spin: 4.4, size: 54 },
+  demonaxe:      { kind: 'shot',  dmg: 50, cd: 1.2, speed: 400, pierce: 99, boomerang: true, spinning: true, size: 72 },
+  prismcannon:   { kind: 'shot',  dmg: 44, cd: .75, speed: 760, pierce: 2, count: 3, size: 30 },
+  worldtree:     { kind: 'orbit', dmg: 36, count: 3, radius: 120, spin: 3, size: 56, slow: true },
+  eclipse:       { kind: 'orbit', dmg: 46, count: 2, radius: 105, spin: 5, size: 72 },
+  quasarhammer:  { kind: 'spin',  dmg: 70, cd: 1.8, reach: 180, knock: 300 },
+  phantomdagger: { kind: 'shot',  dmg: 30, cd: .5,  speed: 640, pierce: 0, count: 4, size: 40 },
+  genesis:       { kind: 'zone',  dmg: 30, cd: 3.0, radius: 160, life: 3.4 },
+  // 기계 전용 칼
+  bluewave:      { kind: 'swing', dmg: 24, cd: .75, reach: 110, arc: 160, knock: 140, slow: true },
+  seadragon:     { kind: 'spin',  dmg: 36, cd: 1.2, reach: 135, knock: 180 },
+  aquacalibur:   { kind: 'swing', dmg: 54, cd: .85, reach: 150, arc: 210, knock: 200, slow: true },
+  royalguard:    { kind: 'thrust', dmg: 28, cd: .7, reach: 150, width: 22 },
+  crownrapier:   { kind: 'thrust', dmg: 36, cd: .5, reach: 175, width: 18 },
+  emperorblade:  { kind: 'swing', dmg: 60, cd: .9,  reach: 155, arc: 220, knock: 220 },
+  goldscimitar:  { kind: 'swing', dmg: 26, cd: .6,  reach: 105, arc: 150, knock: 120 },
+  midas:         { kind: 'spin',  dmg: 40, cd: 1.2, reach: 140, knock: 160 },
+  eldorado:      { kind: 'shot',  dmg: 46, cd: .8,  speed: 600, pierce: 3, count: 3, size: 60 },
+  meteorsword:   { kind: 'spin',  dmg: 30, cd: 1.1, reach: 120, knock: 200 },
+  aurorablade:   { kind: 'swing', dmg: 40, cd: .7,  reach: 140, arc: 190, knock: 150 },
+  infinity:      { kind: 'orbit', dmg: 50, count: 4, radius: 120, spin: 4.6, size: 70 },
 };
+
+/* ---------- 갤럭시 파워 ----------
+   무기마다 하나씩 있는 특수 능력 (브롤스타즈의 스타파워 같은 것)
+   전투 레벨이 GALAXY_LV 이상이면 조각으로 해금하고, 해금한 뒤에는 도감이나 전투 탭에서 착용/해제한다
+   fx: burn(불·독 지속 피해) slow(둔화) leech(흡혈) crit(치명타) power(공격력) execute(약한 적 추가 피해)
+       shield(주기적 보호막) swift(이동 속도) thorns(받은 피해 반사) stun(기절) regen(재생)
+       reach(공격 범위) quick(공격 속도) multi(투사체·궤도 +1) */
+export const GALAXY_LV = 11;
+export const galaxyCost = r => ({ rare: 15, super: 25, hero: 40, legend: 60, ultra: 80 }[r]);
+export const GALAXY = {
+  stick:         { name: '이끼 가시',     fx: 'burn',    v: .3,  desc: '맞은 적이 2초 동안 독으로 공격력의 30% 피해를 더 받아요' },
+  ladle:         { name: '뜨거운 국물',   fx: 'burn',    v: .4,  desc: '맞은 적이 2초 동안 화상으로 공격력의 40% 피해를 더 받아요' },
+  dagger:        { name: '파상풍',        fx: 'slow',    v: 1,   desc: '맞은 적이 1.5초 동안 느려져요' },
+  umbrella:      { name: '빗물 방패',     fx: 'shield',  v: .12, desc: '8초마다 최대 체력 12%만큼 보호막이 생겨요' },
+  brick:         { name: '공사장 정신',   fx: 'stun',    v: .15, desc: '15% 확률로 맞은 적을 0.6초 기절시켜요' },
+  club:          { name: '녹슨 못',       fx: 'burn',    v: .5,  desc: '맞은 적이 2초 동안 공격력의 50% 피해를 더 받아요' },
+  sling:         { name: '연발 새총',     fx: 'multi',   v: 1,   desc: '돌멩이를 하나 더 쏴요' },
+  pipe:          { name: '두 겹 테이프',  fx: 'shield',  v: .15, desc: '8초마다 최대 체력 15%만큼 보호막이 생겨요' },
+  frypan:        { name: '프라이팬 반사', fx: 'thorns',  v: .3,  desc: '받은 피해의 30%를 때린 상대에게 돌려줘요' },
+  kunai:         { name: '그림자 걸음',   fx: 'swift',   v: .15, desc: '이동 속도가 15% 빨라져요' },
+  longsword:     { name: '기사의 맹세',   fx: 'power',   v: .2,  desc: '공격력이 20% 올라가요' },
+  axe:           { name: '룬 각인',       fx: 'leech',   v: .12, desc: '준 피해의 12%만큼 체력을 회복해요' },
+  spear:         { name: '근위대 돌격',   fx: 'reach',   v: .2,  desc: '공격 범위가 20% 넓어져요' },
+  chakram:       { name: '절대 영도',     fx: 'stun',    v: .12, desc: '12% 확률로 맞은 적을 얼려서 0.6초 기절시켜요' },
+  solaris:       { name: '정오의 태양',   fx: 'burn',    v: .6,  desc: '맞은 적이 2초 동안 공격력의 60% 피해를 더 받아요' },
+  dragonstaff:   { name: '용의 숨결',     fx: 'reach',   v: .3,  desc: '폭발 범위가 30% 넓어져요' },
+  thunder:       { name: '뇌신의 분노',   fx: 'multi',   v: 1,   desc: '번개가 하나 더 떨어져요' },
+  frostbow:      { name: '빙결 화살',     fx: 'stun',    v: .15, desc: '15% 확률로 맞은 적을 0.6초 얼려요' },
+  cosmic:        { name: '빅뱅',          fx: 'power',   v: .25, desc: '공격력이 25% 올라가요' },
+  voidreaper:    { name: '영혼 수확',     fx: 'leech',   v: .15, desc: '준 피해의 15%만큼 체력을 회복해요' },
+  blackhole:     { name: '중력 붕괴',     fx: 'reach',   v: .3,  desc: '블랙홀이 30% 커져요' },
+  tidetrident:   { name: '소용돌이',      fx: 'slow',    v: 1,   desc: '맞은 적이 1.5초 동안 크게 느려져요' },
+  phoenixbow:    { name: '불사조의 깃털', fx: 'burn',    v: .6,  desc: '맞은 적이 2초 동안 공격력의 60% 화상 피해를 더 받아요' },
+  stormblade:    { name: '질풍',          fx: 'quick',   v: .2,  desc: '공격 속도가 20% 빨라져요' },
+  moonsickle:    { name: '월식',          fx: 'leech',   v: .15, desc: '준 피해의 15%만큼 체력을 회복해요' },
+  glacierhammer: { name: '영구 동토',     fx: 'stun',    v: .2,  desc: '20% 확률로 맞은 적을 0.6초 얼려요' },
+  serpentwhip:   { name: '맹독',          fx: 'burn',    v: .8,  desc: '맞은 적이 2초 동안 공격력의 80% 독 피해를 더 받아요' },
+  starshuriken:  { name: '유성우',        fx: 'multi',   v: 1,   desc: '수리검을 하나 더 던져요' },
+  runeorb:       { name: '룬 확장',       fx: 'reach',   v: .25, desc: '구슬이 도는 범위가 25% 넓어져요' },
+  thornshield:   { name: '가시 갑옷',     fx: 'thorns',  v: .5,  desc: '받은 피해의 50%를 때린 상대에게 돌려줘요' },
+  meteorstaff:   { name: '대운석',        fx: 'power',   v: .25, desc: '공격력이 25% 올라가요' },
+  windfan:       { name: '순풍',          fx: 'swift',   v: .2,  desc: '이동 속도가 20% 빨라져요' },
+  crimsonkatana: { name: '일섬',          fx: 'crit',    v: .2,  desc: '치명타 확률이 20% 올라가요' },
+  earthgauntlet: { name: '바위 피부',     fx: 'shield',  v: .2,  desc: '8초마다 최대 체력 20%만큼 보호막이 생겨요' },
+  spiritlantern: { name: '혼령의 위로',   fx: 'regen',   v: 3,   desc: '1초마다 체력을 3 회복해요' },
+  sunspear:      { name: '처형의 빛',     fx: 'execute', v: .5,  desc: '체력이 40% 아래인 적에게 피해 50% 추가' },
+  galaxybow:     { name: '은하수',        fx: 'multi',   v: 2,   desc: '화살을 두 개 더 쏴요' },
+  chronoblade:   { name: '시간 정지',     fx: 'stun',    v: .2,  desc: '20% 확률로 맞은 적의 시간을 0.6초 멈춰요' },
+  nebulastaff:   { name: '성운 확장',     fx: 'reach',   v: .35, desc: '성운이 35% 커져요' },
+  supernova:     { name: '극대 폭발',     fx: 'power',   v: .3,  desc: '공격력이 30% 올라가요' },
+  abysstrident:  { name: '심연의 갈증',   fx: 'leech',   v: .2,  desc: '준 피해의 20%만큼 체력을 회복해요' },
+  zeusspear:     { name: '연쇄 낙뢰',     fx: 'multi',   v: 2,   desc: '벼락이 두 개 더 떨어져요' },
+  dragonfang:    { name: '용염',          fx: 'burn',    v: 1,   desc: '맞은 적이 2초 동안 공격력만큼 불 피해를 더 받아요' },
+  angelwing:     { name: '축복',          fx: 'regen',   v: 5,   desc: '1초마다 체력을 5 회복해요' },
+  demonaxe:      { name: '마왕의 처형',   fx: 'execute', v: .8,  desc: '체력이 40% 아래인 적에게 피해 80% 추가' },
+  prismcannon:   { name: '굴절',          fx: 'crit',    v: .25, desc: '치명타 확률이 25% 올라가요' },
+  worldtree:     { name: '생명의 껍질',   fx: 'shield',  v: .25, desc: '8초마다 최대 체력 25%만큼 보호막이 생겨요' },
+  eclipse:       { name: '개기 일식',     fx: 'thorns',  v: .6,  desc: '받은 피해의 60%를 때린 상대에게 돌려줘요' },
+  quasarhammer:  { name: '광속',          fx: 'quick',   v: .25, desc: '공격 속도가 25% 빨라져요' },
+  phantomdagger: { name: '환영 분신',     fx: 'swift',   v: .25, desc: '이동 속도가 25% 빨라져요' },
+  genesis:       { name: '창세',          fx: 'regen',   v: 6,   desc: '1초마다 체력을 6 회복해요' },
+  bluewave:      { name: '밀물',          fx: 'slow',    v: 1,   desc: '맞은 적이 1.5초 동안 느려져요' },
+  seadragon:     { name: '청룡의 포효',   fx: 'stun',    v: .18, desc: '18% 확률로 맞은 적을 0.6초 기절시켜요' },
+  aquacalibur:   { name: '호수의 축복',   fx: 'leech',   v: .2,  desc: '준 피해의 20%만큼 체력을 회복해요' },
+  royalguard:    { name: '근위대의 방패', fx: 'shield',  v: .15, desc: '8초마다 최대 체력 15%만큼 보호막이 생겨요' },
+  crownrapier:   { name: '왕관의 일격',   fx: 'crit',    v: .25, desc: '치명타 확률이 25% 올라가요' },
+  emperorblade:  { name: '제국의 위엄',   fx: 'power',   v: .3,  desc: '공격력이 30% 올라가요' },
+  goldscimitar:  { name: '사막의 바람',   fx: 'quick',   v: .2,  desc: '공격 속도가 20% 빨라져요' },
+  midas:         { name: '황금의 손',     fx: 'execute', v: .6,  desc: '체력이 40% 아래인 적에게 피해 60% 추가' },
+  eldorado:      { name: '황금 비',       fx: 'multi',   v: 2,   desc: '날아가는 칼이 두 자루 더 생겨요' },
+  meteorsword:   { name: '불타는 운석',   fx: 'burn',    v: .6,  desc: '맞은 적이 2초 동안 공격력의 60% 불 피해를 더 받아요' },
+  aurorablade:   { name: '극광',          fx: 'regen',   v: 4,   desc: '1초마다 체력을 4 회복해요' },
+  infinity:      { name: '무한 확장',     fx: 'reach',   v: .3,  desc: '칼이 도는 범위가 30% 넓어져요' },
+};
+// 이 무기의 갤럭시 파워를 착용 중이면 돌려준다
+export const galaxyOn = id => GALAXY[id] && state.galaxy?.[id] && !state.gpOff?.[id] ? GALAXY[id] : null;
+// 상태: none(없음) locked(전투 레벨 부족) buy(해금 가능) off(해금했지만 벗음) on(착용 중)
+export function galaxyState(w) {
+  if (!GALAXY[w.id] || !state.inv[w.id]) return 'none';
+  if (state.galaxy?.[w.id]) return state.gpOff?.[w.id] ? 'off' : 'on';
+  return armLevel(state.inv[w.id]) >= GALAXY_LV ? 'buy' : 'locked';
+}
+// 해금하면 바로 착용된다
+export function unlockGalaxy(w) {
+  const cost = galaxyCost(w.r);
+  if (galaxyState(w) !== 'buy' || state.shards < cost) return false;
+  state.shards -= cost;
+  state.galaxy = { ...state.galaxy, [w.id]: true };
+  state.gpOff = { ...state.gpOff, [w.id]: false };
+  return true;
+}
+export function toggleGalaxy(w) {
+  const s = galaxyState(w); if (s !== 'on' && s !== 'off') return false;
+  state.gpOff = { ...state.gpOff, [w.id]: s === 'on' };
+  return true;
+}
 
 // 일반 적. from: 처음 나오는 웨이브, w: 나올 확률 가중치, drop: 조각을 떨어뜨릴 확률
 export const ENEMIES = {
