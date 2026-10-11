@@ -4,6 +4,7 @@ import './ui/test.js';
 import './ui/dex.js';
 import './ui/battle.js';
 import './ui/ranking.js';
+import './ui/pvp.js';
 import { state, SUPER, save } from './state.js';
 import { MAX_LEVEL, LUCK_MAX } from './config.js';
 import { WEAPONS } from './three/weapons.js';

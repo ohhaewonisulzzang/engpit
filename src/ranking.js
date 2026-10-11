@@ -118,3 +118,12 @@ export async function fetchMine(month) {
   const n = +(headers.get('content-range') || '').split('/')[1];
   return { wave, kills, rank: Number.isFinite(n) ? n + 1 : null };
 }
+
+// 경쟁전 비공개 채널에 들어갈 때 쓰는 로그인 토큰 (곧 만료되면 새로 받음)
+export const freshToken = () => token();
+// 로그인한 사람으로 서버 함수 부르기 (경쟁전에서 사용)
+export async function rpc(name, body = {}) {
+  const t = await token(); if (!t) throw Object.assign(new Error('login required'), { status: 401 });
+  return (await req(`/rest/v1/rpc/${name}`, { method: 'POST', token: t, body })).data;
+}
+export const getRows = async path => (await req(`/rest/v1/${path}`)).data;
