@@ -6,7 +6,7 @@ import { WEAPONS } from '../three/weapons.js';
 import { thumb } from './dex.js';
 import { toast } from './common.js';
 import { galaxyHTML, bindGalaxy } from './galaxy.js';
-import { submitWave, session, rankReady } from '../ranking.js';
+import { beginRun, submitWave, session, rankReady } from '../ranking.js';
 import { G, hooks, startRun, choosePerk, setPaused, quitRun, clearRun } from '../battle/game.js';
 import { ARMS, KIND_NAME, MAX_EQUIP, PERKS, WAVE_LEN, MAX_ARM_LV, armLevel, lvMult, galaxyOn } from '../battle/data.js';
 
@@ -74,6 +74,7 @@ $('bLobby').onclick = e => {
 };
 function go() {
   clearRun(); startRun(equipped());
+  beginRun(); // 랭킹용 판 번호 받기 (로그인했을 때만)
   ['bLobby', 'bEnd', 'bPerk', 'bPause'].forEach(id => show(id, false));
   $('bhud').hidden = false; SFX.pop();
 }
@@ -131,8 +132,11 @@ hooks.end = s => {
   show('bEnd', true);
   // 이번 판 결과를 월간 랭킹에 올림 (서버가 이번 달 최고 기록보다 좋을 때만 바꿈)
   if (session && rankReady()) submitWave(s.wave, s.kills)
-    .then(ok => { if ($('bRank')) $('bRank').textContent = ok ? '랭킹에 기록했어요. 랭킹 탭에서 순위를 확인해 보세요!' : '테스트 모드에서는 랭킹에 올리지 않아요'; })
-    .catch(() => { if ($('bRank')) $('bRank').textContent = '랭킹에 올리지 못했어요 (인터넷 연결 확인)'; });
+    .then(r => { if ($('bRank')) $('bRank').textContent = {
+      ok: '랭킹에 기록했어요. 랭킹 탭에서 순위를 확인해 보세요!', test: '테스트 모드에서는 랭킹에 올리지 않아요',
+      hidden: '이 계정은 랭킹에 올라가지 않아요', norun: '판을 시작할 때 랭킹 서버에 연결되지 않아 이번 판은 기록되지 않았어요', off: '',
+    }[r]; })
+    .catch(() => { if ($('bRank')) $('bRank').textContent = '랭킹에 올리지 못했어요 (인터넷 연결이나 기록을 확인할 수 없었어요)'; });
   $('bRetry').onclick = go;
   $('bToLobby').onclick = () => { show('bEnd', false); clearRun(); renderBattle(); show('bLobby', true); };
 };

@@ -62,8 +62,8 @@ export async function logIn(id, pw) {
 // 서버 프로필에서 아이디(대소문자 그대로)와 슈퍼계정 여부를 붙인다
 async function withProfile(s) {
   try {
-    const rows = (await req(`/rest/v1/profiles?id=eq.${s.uid}&select=username,is_super`, { token: s.token })).data;
-    if (rows?.[0]) { s.username = rows[0].username; s.super = !!rows[0].is_super; }
+    const rows = (await req(`/rest/v1/profiles?id=eq.${s.uid}&select=username,is_super,hide_rank`, { token: s.token })).data;
+    if (rows?.[0]) { s.username = rows[0].username; s.super = !!rows[0].is_super; s.hideRank = !!rows[0].hide_rank; }
   } catch (e) {}
   return s;
 }
@@ -77,17 +77,30 @@ async function token() {
   if (Date.now() < session.exp) return session.token;
   try {
     const { data } = await req('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh } });
-    setSession({ ...fromAuth(data, session.username), super: session.super });
+    setSession({ ...fromAuth(data, session.username), super: session.super, hideRank: session.hideRank });
     return session.token;
   } catch (e) { if (e.status === 400 || e.status === 401) setSession(null); return null; }
 }
 
+// 판 시작: 서버에서 판 번호를 받아 둔다. 끝나면 이 번호로만 기록을 올릴 수 있고,
+// 서버는 판이 시작된 뒤 실제로 흐른 시간에 비해 웨이브·처치 수가 말이 되는지 확인한다 (supabase/secure_runs.sql)
+let runId = null;
+export async function beginRun() {
+  runId = null;
+  if (!rankReady() || TEST_MODE || !session) return;
+  const t = await token(); if (!t) return;
+  try { runId = (await req('/rest/v1/rpc/start_run', { method: 'POST', token: t, body: {} })).data; } catch (e) {}
+}
 // 전투 한 판 결과 올리기 (서버가 이번 달 최고 기록보다 좋을 때만 바꿈)
+// 돌려주는 값: 'ok' | 'test'(개발 서버) | 'hidden'(랭킹 제외 계정) | 'norun'(판 번호를 못 받음) | 'off'(로그인 안 함)
 export async function submitWave(wave, kills) {
-  if (!rankReady() || TEST_MODE || !session) return false;
-  const t = await token(); if (!t) return false;
-  await req('/rest/v1/rpc/submit_wave', { method: 'POST', token: t, body: { p_wave: wave, p_kills: kills } });
-  return true;
+  if (!rankReady() || !session) return 'off';
+  if (TEST_MODE) return 'test';
+  const id = runId; runId = null;
+  if (!id) return 'norun';
+  const t = await token(); if (!t) return 'off';
+  await req('/rest/v1/rpc/submit_wave', { method: 'POST', token: t, body: { p_run: id, p_wave: wave, p_kills: kills } });
+  return session.hideRank ? 'hidden' : 'ok';
 }
 
 const ORDER = 'order=wave.desc,kills.desc,updated_at.asc';
