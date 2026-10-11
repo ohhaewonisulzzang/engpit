@@ -42,6 +42,27 @@ function cleanInfo(x) {
 }
 const cleanLo = lo => [0, 1].map(i => (Array.isArray(lo?.[i]) ? lo[i] : []).slice(0, PICKS).map(e => ({
   id: e?.id === 'fists' || byId(e?.id) ? e.id : 'fists', lv: Math.max(1, Math.min(MAX_ARM_LV, Math.floor(+e?.lv) || 1)), gp: !!e?.gp && !!GALAXY[e?.id] })));
+// 호스트(상대)가 보낸 화면 정보: 숫자는 숫자로, 단계 이름은 정해진 것만 (화면에 넣기 전에 정리)
+const num = v => Number.isFinite(+v) ? +v : 0;
+const nums = a => (Array.isArray(a) ? a : []).map(num);
+const PHASES = ['count', 'fight', 'break', 'over'];
+const EV_TYPES = ['sw', 'th', 'bo', 'rg', 'tx', 'dash', 'go', 'round', 'over'];
+function cleanSnap(m) {
+  const sc = [0, 1].map(i => Math.max(0, Math.min(ROUNDS_TO_WIN, Math.floor(num(m.sc?.[i])))));
+  const ev = (Array.isArray(m.ev) ? m.ev : []).filter(e => e && EV_TYPES.includes(e.t)).slice(0, 200).map(e => ({
+    t: e.t, i: num(e.i), o: num(e.o) ? 1 : 0, a: Math.max(0, Math.min(PICKS - 1, Math.floor(num(e.a)))), w: num(e.w),
+    x: num(e.x), y: num(e.y), ang: num(e.ang), arc: num(e.arc), reach: num(e.reach), spin: num(e.spin), dir: num(e.dir) < 0 ? -1 : 1,
+    r0: num(e.r0), r1: num(e.r1), b: !!e.b, c: /^#[0-9a-f]{3,8}$/i.test(e.c) ? e.c : '#ffffff',
+    v: typeof e.v === 'number' ? Math.round(e.v) : ['회피', '막음', '기절!'].includes(e.v) ? e.v : '' }));
+  const row = (a, n) => nums(a).slice(0, n);
+  return { k: 's', t: num(m.t), ph: PHASES.includes(m.ph) ? m.ph : 'fight', pt: num(m.pt), rt: num(m.rt), rd: Math.max(1, Math.floor(num(m.rd)) || 1),
+    sc, w: [0, 1].includes(m.w) ? m.w : -1, lr: num(m.lr),
+    p: [0, 1].map(i => { const r = row(m.p?.[i], 11); while (r.length < 11) r.push(0); return r; }),
+    oa: [0, 1].map(i => row(m.oa?.[i], PICKS)),
+    sh: (Array.isArray(m.sh) ? m.sh : []).slice(0, 300).map(x => { const r = row(x, 7); r[1] = r[1] ? 1 : 0; r[2] = Math.max(0, Math.min(PICKS - 1, Math.floor(r[2]))); return r; }),
+    z: (Array.isArray(m.z) ? m.z : []).slice(0, 50).map(x => { const r = row(x, 6); r[0] = r[0] ? 1 : 0; r[1] = Math.max(0, Math.min(PICKS - 1, Math.floor(r[1]))); return r; }),
+    b: (Array.isArray(m.b) ? m.b : []).slice(0, 50).map(x => row(x, 4)), ev };
+}
 const cleanIds = a => (Array.isArray(a) ? a : []).filter(id => id === 'fists' || byId(id));
 async function myRating() {
   if (!session) return { pts: 0, wins: 0, losses: 0 };
@@ -187,12 +208,12 @@ function onMsg(m) {
   else if (m.k === 'start' && P.role === 'guest' && P.stage !== 'match' && P.stage !== 'end') startFight(cleanLo(m.lo));
   else if (m.k === 's' && P.role === 'guest') {
     if (P.stage === 'draft') return; // 시작 메시지를 아직 못 받음
-    P.prev = P.cur; P.prevAt = P.curAt; P.cur = m; P.curAt = performance.now(); P.lastSnap = Date.now();
+    P.prev = P.cur; P.prevAt = P.curAt; P.cur = cleanSnap(m); P.curAt = performance.now(); P.lastSnap = Date.now();
   } else if (m.k === 'i' && P.role === 'host') {
     const c = v => Math.max(-1, Math.min(1, +v || 0));
     P.inp[1] = { mx: c(m.mx), my: c(m.my), dash: Math.floor(+m.dash) || 0 }; P.gotInput = true;
   }
-  else if (m.k === 'end' && P.role === 'guest' && P.stage === 'match') finish(m.w, false, m.sc);
+  else if (m.k === 'end' && P.role === 'guest' && P.stage === 'match') finish([0, 1].includes(m.w) ? m.w : -1, false, cleanSnap({ sc: m.sc }).sc);
 }
 
 /* =========================================================
