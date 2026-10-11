@@ -3,7 +3,8 @@
 --  - 판 번호는 한 번만 쓸 수 있고, 남의 판 번호는 못 쓴다
 --  - 웨이브 w에 도달하려면 앞 웨이브를 각각 40초 이상 버텨야 하므로, 실제로 흐른 시간보다 높은 웨이브는 거절
 --  - 처치 수도 흐른 시간에 비해 너무 많으면 거절
---  - 1분에 판을 10번 넘게 열 수 없음
+--  - 1분에 판을 10번 넘게 열 수 없고, 새 판을 열면 예전 판은 못 씀 (판은 하나만 열려 있음)
+--  - 웨이브는 최대 300
 -- (브라우저 코드를 고쳐서 게임을 쉽게 만드는 것까지는 못 막지만, 콘솔에서 숫자만 보내는 조작은 막힌다)
 
 create table if not exists public.runs (
@@ -24,6 +25,8 @@ begin
     raise exception 'too many runs';
   end if;
   delete from runs where user_id = auth.uid() and started_at < now() - interval '1 day';
+  -- 새 판을 열면 끝내지 않은 예전 판은 못 쓰게 됨 (판을 여러 개 열어 두고 기다리는 것 방지)
+  update runs set used = true where user_id = auth.uid() and not used;
   insert into runs (user_id) values (auth.uid()) returning id into r;
   return r;
 end $$;
@@ -45,7 +48,7 @@ begin
 
   sec := extract(epoch from now() - run.started_at);
   if sec > 6 * 3600 then raise exception 'run expired'; end if;
-  if p_wave is null or p_wave < 1 or p_kills is null or p_kills < 0 then raise exception 'bad record'; end if;
+  if p_wave is null or p_wave < 1 or p_wave > 300 or p_kills is null or p_kills < 0 then raise exception 'bad record'; end if;
   if (p_wave - 1) * 40 > sec + 5 then raise exception 'too fast'; end if;      -- 웨이브마다 40초
   if p_kills > sec * 60 + 50 then raise exception 'too many kills'; end if;    -- 1초에 60마리는 넉넉한 상한
 
