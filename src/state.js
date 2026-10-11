@@ -1,5 +1,9 @@
 // 저장 데이터 (브라우저 localStorage)
-export const SAVE_KEY = 'engpit_save_v1';
+// 슈퍼계정으로 로그인하면 따로 저장해서, 같은 브라우저의 일반 진행 상황과 섞이지 않게 한다
+export const SLOT_KEY = 'engpit_slot';
+const slot = (() => { try { return localStorage.getItem(SLOT_KEY); } catch (e) { return null; } })();
+export const SUPER = !!slot;
+export const SAVE_KEY = slot ? 'engpit_save_' + slot : 'engpit_save_v1';
 export const DEFAULT = () => ({
   coins: 3, inv: {}, pulls: 0, correct: 0, wrong: 0, custom: [], missed: {},
   level: 1, // 뽑기 기계 레벨 (조각으로 업그레이드)

@@ -1,7 +1,9 @@
-import { state } from './state.js';
+import { state, SUPER } from './state.js';
 
 // 테스트 모드(코인 무한, 테스트용 버튼): 개발 서버(npm run dev)에서만 켜지고 배포판에서는 꺼짐
 export const TEST_MODE = import.meta.env.DEV;
+// 코인 무한: 테스트 모드이거나 슈퍼계정으로 로그인했을 때
+export const FREE = TEST_MODE || SUPER;
 
 // 월간 조각 랭킹 서버 (Supabase). 비어 있으면 랭킹 탭에서 "서버 설정 필요"라고 보여 준다
 // anon 키는 브라우저에 공개돼도 되는 키라서 코드에 그대로 넣는다 (쓰기는 supabase/ranking.sql의 함수로만 가능)

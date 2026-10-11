@@ -8,8 +8,9 @@ import { RANKING, TEST_MODE } from './config.js';
 export const rankReady = () => !!(RANKING.url && RANKING.key);
 const BASE = () => RANKING.url.replace(/\/$/, '');
 const AUTH_KEY = 'engpit_auth';
-export const ID_RULE = /^[a-z0-9_]{3,16}$/;
-const toEmail = id => `${id}@engpit.game`;
+export const ID_RULE = /^[A-Za-z0-9_]{3,16}$/;
+// 아이디는 쓴 그대로 보이지만 로그인은 대소문자를 가리지 않는다
+const toEmail = id => `${id.toLowerCase()}@engpit.game`;
 
 // 로그인 정보 { token, refresh, exp, uid, username }
 export let session = (() => { try { return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch (e) { return null; } })();
@@ -39,7 +40,7 @@ const fromAuth = (d, username) => ({
 // 서버 오류를 화면에 보여 줄 말로
 export function authError(e) {
   const m = (e.code || '') + ' ' + (e.message || '');
-  if (/already|exists|registered/i.test(m)) return '이미 있는 아이디예요. 다른 아이디를 써 주세요.';
+  if (/already|exists|registered|Database error saving/i.test(m)) return '이미 있는 아이디예요. 다른 아이디를 써 주세요.';
   if (/invalid_credentials|Invalid login/i.test(m)) return '아이디 또는 비밀번호가 맞지 않아요.';
   if (/weak_password|Password should/i.test(m)) return '비밀번호는 6자 이상으로 써 주세요.';
   if (/email_not_confirmed|confirm/i.test(m)) return '서버에서 "Confirm email" 설정을 꺼야 가입할 수 있어요.';
@@ -52,11 +53,19 @@ export async function signUp(id, pw) {
   const { data } = await req('/auth/v1/signup', { method: 'POST', body: { email: toEmail(id), password: pw, data: { username: id } } });
   // 인증 메일 설정이 켜져 있으면 세션 없이 사용자만 돌아온다
   if (!data?.access_token) throw Object.assign(new Error('confirm'), { code: 'email_not_confirmed' });
-  setSession(fromAuth(data, id));
+  setSession(await withProfile(fromAuth(data, id)));
 }
 export async function logIn(id, pw) {
   const { data } = await req('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: toEmail(id), password: pw } });
-  setSession(fromAuth(data));
+  setSession(await withProfile(fromAuth(data)));
+}
+// 서버 프로필에서 아이디(대소문자 그대로)와 슈퍼계정 여부를 붙인다
+async function withProfile(s) {
+  try {
+    const rows = (await req(`/rest/v1/profiles?id=eq.${s.uid}&select=username,is_super`, { token: s.token })).data;
+    if (rows?.[0]) { s.username = rows[0].username; s.super = !!rows[0].is_super; }
+  } catch (e) {}
+  return s;
 }
 export function logOut() {
   const t = session?.token; setSession(null);
@@ -68,7 +77,7 @@ async function token() {
   if (Date.now() < session.exp) return session.token;
   try {
     const { data } = await req('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh } });
-    setSession(fromAuth(data, session.username));
+    setSession({ ...fromAuth(data, session.username), super: session.super });
     return session.token;
   } catch (e) { if (e.status === 400 || e.status === 401) setSession(null); return null; }
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { $ } from './dom.js';
 import { state, save } from './state.js';
-import { RARITIES, RAR, TEST_MODE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE } from './config.js';
+import { RARITIES, RAR, FREE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE } from './config.js';
 import { ac, SFX } from './sound.js';
 import { V3, glow, disposeObj, U } from './three/helpers.js';
 import { buildWeapon, WEAPONS } from './three/weapons.js';
@@ -28,13 +28,13 @@ export function rollRarity() {
 }
 export function startPull() {
   if (pull || upgrading) return false;
-  if (!TEST_MODE && state.coins < 1) {
+  if (!FREE && state.coins < 1) {
     toast('코인이 없어요. 단어 테스트에서 한 문제 맞힐 때마다 1개씩 받을 수 있어요.');
     $('coinBox').classList.remove('shake'); void $('coinBox').offsetWidth; $('coinBox').classList.add('shake');
     SFX.wrong(); return false;
   }
   ac();
-  if (!TEST_MODE) state.coins--;
+  if (!FREE) state.coins--;
   state.pulls++;
   const rar = rollRarity();
   // 지금 기계 레벨 이하의 전용 칼이 그 등급에 있으면 EXCLUSIVE_CHANCE 확률로 전용 칼, 아니면 일반 무기
@@ -177,7 +177,7 @@ export function showResult() {
   $('resRar').classList.toggle('ultra-c', p.rar.key === 'ultra');
   $('resName').innerHTML = p.w.name + (p.isNew ? '<span class="newb">NEW!</span>' : '');
   $('resDesc').innerHTML = p.w.desc + `<br><span class="own">${state.inv[p.w.id]}개 보유</span> · 전투 Lv.${armLevel(state.inv[p.w.id])}`;
-  $('btnAgain').disabled = !TEST_MODE && state.coins < 1;
+  $('btnAgain').disabled = !FREE && state.coins < 1;
   updateDismBtn();
   el.classList.add('show'); $('pullbar').style.opacity = 0;
   if (auto.on) autoNext(p);
@@ -237,7 +237,7 @@ function autoNext(p) {
     $('resDesc').querySelector('.own').textContent = `${state.inv[p.w.id]}개 보유 (분해함, 조각 ${state.shards}개)`;
   }
   if (auto.stop && p.rar.rank >= RAR[auto.stop].rank) return setAuto(false, `${p.rar.name}! 자동 뽑기를 멈췄어요`);
-  if (!TEST_MODE && state.coins < 1) return setAuto(false, '코인이 다 떨어져서 자동 뽑기를 멈췄어요');
+  if (!FREE && state.coins < 1) return setAuto(false, '코인이 다 떨어져서 자동 뽑기를 멈췄어요');
   auto.timer = setTimeout(() => { if (auto.on && pull?.phase === 'show') closeResult(true); }, 900);
 }
 $('autoBtn').onclick = () => setAuto(!auto.on);
@@ -311,7 +311,7 @@ export function loop() {
     if (!pull || pull.phase !== 'crank') domeCaps.forEach(c => { c.position.y = c.userData.base.y + Math.sin(t * 1.3 + c.userData.ph) * .012; c.position.x = c.userData.base.x; c.position.z = c.userData.base.z; });
     bulbs.forEach((b, i) => { b.material.emissiveIntensity = ((Math.floor(t * (pull || upgrading ? 12 : machineFx.blink)) + i) % 2) ? 2.5 : .2; });
     topBulbM.emissive.setHSL((t * .15) % 1, 1, .5);
-    btnM.emissiveIntensity = TEST_MODE || state.coins > 0 ? 1 + Math.sin(t * 5) * .8 : .1;
+    btnM.emissiveIntensity = FREE || state.coins > 0 ? 1 + Math.sin(t * 5) * .8 : .1;
     updatePull(auto.on ? dt * 2.2 : dt, t);
     updateMachine(t, dt);
     updateUpgrade(dt);

@@ -1,7 +1,7 @@
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
 import { SFX } from '../sound.js';
-import { RARITIES, TEST_MODE, MAX_LEVEL, lvl, chanceOf, pct, machineCost } from '../config.js';
+import { RARITIES, TEST_MODE, FREE, MAX_LEVEL, lvl, chanceOf, pct, machineCost } from '../config.js';
 import { WEAPONS } from '../three/weapons.js';
 import { resize } from '../three/effects.js';
 import { pull, upgrading, closeResult, clock, upgradeMachine, auto, setAuto } from '../gacha.js';
@@ -55,9 +55,9 @@ export function switchTab(tab) {
 let toastT;
 export function toast(html) { const t = $('toast'); t.innerHTML = html; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
 export function updateHUD() {
-  const broke = !TEST_MODE && state.coins < 1;
-  $('coinNum').textContent = TEST_MODE ? '∞' : state.coins;
-  $('coinBox').title = TEST_MODE ? '테스트 모드: 코인 무한' : '보유 코인';
+  const broke = !FREE && state.coins < 1;
+  $('coinNum').textContent = FREE ? '∞' : state.coins;
+  $('coinBox').title = TEST_MODE ? '테스트 모드: 코인 무한' : FREE ? '슈퍼계정: 코인 무한' : '보유 코인';
   $('pullBtn').classList.toggle('broke', broke);
   $('pullHint').innerHTML = broke
     ? '코인이 없어요. <b>단어 테스트</b>에서 한 문제 맞히면 1개를 받아요'
