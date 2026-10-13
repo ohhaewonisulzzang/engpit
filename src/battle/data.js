@@ -6,9 +6,9 @@ import { state } from '../state.js';
 export const MAX_EQUIP = 3;      // 전투에 들고 갈 수 있는 무기 수
 export const WAVE_LEN = 40;      // 웨이브마다 보스가 나오기까지 버티는 시간(초)
 
-// 전투 레벨 = 가진 개수 + 조각으로 올린 단계 (분해하면 개수만큼 내려감)
+// 전투 레벨 = 1 + 조각으로 올린 단계 (무기는 하나씩만 가진다)
 export const MAX_ARM_LV = 11;
-export const armLevel = id => Math.max(1, Math.min((state.inv[id] || 0) + (state.armUp?.[id] || 0), MAX_ARM_LV));
+export const armLevel = id => Math.min(1 + (state.inv[id] ? state.armUp?.[id] || 0 : 0), MAX_ARM_LV);
 // 조각으로 전투 레벨 1 올리기: 높은 등급일수록, 레벨이 높을수록 비싸다
 export const armUpCost = w => ({ rare: 2, super: 3, hero: 5, legend: 8, ultra: 12 }[w.r]) * armLevel(w.id);
 export function buyArmUp(w) {

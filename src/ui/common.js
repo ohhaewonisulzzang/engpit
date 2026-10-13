@@ -96,7 +96,7 @@ export function renderOdds() {
   const ex = WEAPONS.filter(w => w.m && w.m <= state.level);
   $('odds').classList.toggle('open', oddsOpen);
   $('odds').innerHTML = `<button class="odds-sum" id="oddsSum"><b>Lv.${state.level} ${lvl().name}</b><span class="odds-more">확률 보기</span></button>
-    <div class="odds-body"><small class="odds-next">${next}</small>${state.luck ? `<small class="luck">행운 ${state.luck}단계 적용 중</small>` : ''}<small class="pity">레전더리 이상 확정까지 <b>${PITY.legend - state.pity.legend}</b>회 · 울트라 확정까지 <b>${PITY.ultra - state.pity.ultra}</b>회</small>` +
+    <div class="odds-body"><small class="odds-next">${next}</small>${state.luck ? `<small class="luck">행운 ${state.luck}단계 적용 중</small>` : ''}<small class="pity">가진 무기는 다시 안 나와요. 다 모은 등급은 코인·조각으로 받아요</small><small class="pity">레전더리 이상 확정까지 <b>${PITY.legend - state.pity.legend}</b>회 · 울트라 확정까지 <b>${PITY.ultra - state.pity.ultra}</b>회</small>` +
     [...RARITIES].reverse().map(r => `<div class="orow"><span><i style="background:${r.color}"></i>${r.name}</span><span>${pct(chanceOf(r.key))}%</span></div>`).join('') +
     (ex.length ? `<div class="mex"><b>기계 전용 칼 ${ex.length}종이 나와요</b><span>${ex.filter(w => state.inv[w.id]).length}종 획득 · 도감에서 확인</span></div>` : '') +
     (TEST_MODE ? '<div class="testbar"><button id="tUp">테스트: 기계 업그레이드</button><button id="tReset">1레벨로</button><button id="tShard">조각 +100</button><button id="tAll">무기 전부 열기</button></div>' : '') + '</div>';

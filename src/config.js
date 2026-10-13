@@ -41,8 +41,12 @@ export const EXCLUSIVE_CHANCE = .4;
 
 // 분해와 행운: 남는 희귀/초희귀를 분해하거나 전투에서 적을 잡으면 조각이 나오고, 조각으로 행운을 올리면
 // 높은 등급 확률이 조금씩 오른다 (오른 만큼 희귀 확률이 줄어듦)
-// 희귀·초희귀는 1개만 남기고 분해, 영웅 이상은 전투 레벨이 최대를 넘는 만큼만 분해 (forge.js의 spare)
-export const SHARD_VALUE = { rare: 1, super: 2, hero: 8, legend: 20, ultra: 50 }; // 1개 분해할 때 나오는 조각
+// 예전 저장 데이터에서 겹친 무기를 조각으로 바꿔 줄 때 1개당 조각 (main.js의 옮기기)
+export const SHARD_VALUE = { rare: 1, super: 2, hero: 8, legend: 20, ultra: 50 };
+// 가진 무기는 다시 안 나온다. 뽑힌 등급의 무기를 다 모았으면 무기 대신 코인(COIN_CHANCE 확률로 3~4개) 또는 조각
+export const PRIZE_SHARDS = { rare: 10, super: 20, hero: 50, legend: 120, ultra: 300 };
+export const PRIZE_COINS = () => 3 + Math.floor(Math.random() * 2);
+export const COIN_CHANCE = .1;
 
 // 천장: 이 횟수 안에 그 등급 이상이 한 번도 안 나오면 이번 뽑기에서 확정으로 나온다
 export const PITY = { legend: 30, ultra: 80 };

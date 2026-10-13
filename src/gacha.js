@@ -1,17 +1,16 @@
 import * as THREE from 'three';
 import { $ } from './dom.js';
 import { state, save } from './state.js';
-import { RARITIES, RAR, FREE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE, PITY } from './config.js';
+import { RARITIES, RAR, FREE, MAX_LEVEL, lvl, chanceOf, EXCLUSIVE_CHANCE, PITY, PRIZE_SHARDS, PRIZE_COINS, COIN_CHANCE } from './config.js';
 import { ac, SFX } from './sound.js';
 import { V3, glow, disposeObj, U } from './three/helpers.js';
-import { buildWeapon, WEAPONS } from './three/weapons.js';
+import { buildWeapon } from './three/weapons.js';
 import { stage, renderer, scene, camera, CAM_HOME, LOOK_HOME, CAM_FOCUS, LOOK_FOCUS, R, revealLight, makeCapsule } from './three/scene.js';
 import { machine, topBulbM, domeCaps, bulbs, crank, btnM, flap, machineFx, applyMachineTheme, updateMachine } from './three/machine.js';
 import { dimmer, makeRays, burst, updateBursts } from './three/effects.js';
 import { currentTab, toast, updateHUD, renderOdds } from './ui/common.js';
-import { spare, dismantle, grant } from './forge.js';
+import { grant, freshOf } from './forge.js';
 import { pv, renderPreview, thumb } from './ui/dex.js';
-import { armLevel } from './battle/data.js';
 
 /* =========================================================
    뽑기 진행
@@ -32,16 +31,40 @@ export function rollRarity() {
   p.legend = got.rank >= RAR.legend.rank ? 0 : p.legend + 1;
   return got;
 }
-// 코인 1개로 한 번 뽑아서 무기를 넣는다 (연출 없이 결과만)
+// 코인 1개로 한 번 뽑는다 (연출 없이 결과만)
+// - 등급 확률은 그대로, 그 등급에서 아직 없는 무기만 나온다
+// - 그 등급 무기를 다 모았으면 무기 대신 코인이나 조각 (prize)
 function rollOne() {
   if (!FREE) state.coins--;
   state.pulls++;
-  const rar = rollRarity();
-  // 지금 기계 레벨 이하의 전용 칼이 그 등급에 있으면 EXCLUSIVE_CHANCE 확률로 전용 칼, 아니면 일반 무기
-  const ex = WEAPONS.filter(w => w.m && w.m <= state.level && w.r === rar.key);
-  const pool = ex.length && Math.random() < EXCLUSIVE_CHANCE ? ex : WEAPONS.filter(w => !w.m && w.r === rar.key);
+  const rar = rollRarity(), fresh = freshOf(rar.key);
+  if (!fresh.length) {
+    const coin = Math.random() < COIN_CHANCE, n = coin ? PRIZE_COINS() : PRIZE_SHARDS[rar.key];
+    if (coin) state.coins += n; else state.shards += n;
+    return { rar, prize: { kind: coin ? 'coins' : 'shards', n } };
+  }
+  // 아직 없는 기계 전용 칼이 있으면 EXCLUSIVE_CHANCE 확률로 전용 칼, 아니면 일반 무기
+  const ex = fresh.filter(w => w.m), nor = fresh.filter(w => !w.m);
+  const pool = ex.length && (!nor.length || Math.random() < EXCLUSIVE_CHANCE) ? ex : nor;
   const w = pool[Math.floor(Math.random() * pool.length)];
-  return { rar, w, isNew: grant(w) };
+  grant(w);
+  return { rar, w };
+}
+const prizeName = p => p.kind === 'coins' ? `코인 ${p.n}개` : `조각 ${p.n}개`;
+// 무기 대신 나온 코인·조각 모형
+function buildPrize(p) {
+  const outer = new THREE.Group(), g = new THREE.Group(); g.scale.setScalar(.55); outer.add(g);
+  if (p.kind === 'coins') {
+    const m = new THREE.MeshStandardMaterial({ color: 0xffc83d, metalness: 1, roughness: .25, emissive: 0x8a5a00, emissiveIntensity: .5 });
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(.62, .62, .14, 48), m); c.rotation.x = Math.PI / 2; g.add(c);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(.5, .035, 12, 48), m); rim.position.z = .08; g.add(rim);
+  } else {
+    const m = new THREE.MeshStandardMaterial({ color: 0x8af3ff, metalness: .3, roughness: .1, emissive: 0x2a9fb0, emissiveIntensity: .8 });
+    [[0, .1, 0, .34], [-.42, -.25, .1, .22], [.4, -.2, -.1, .25], [.15, .5, .2, .18], [-.2, -.55, -.15, .16]].forEach(([x, y, z, s]) => {
+      const o = new THREE.Mesh(new THREE.OctahedronGeometry(s), m); o.position.set(x, y, z); o.scale.y = 1.5; g.add(o);
+    });
+  }
+  return outer;
 }
 export function startPull() {
   if (pull || upgrading || multi) return false;
@@ -51,7 +74,7 @@ export function startPull() {
     SFX.wrong(); return false;
   }
   ac();
-  const { rar, w, isNew } = rollOne();
+  const { rar, w, prize } = rollOne();
   save(); updateHUD(); renderOdds();
   // 캡슐 색 연출 (높은 등급은 낮은 색에서 승급!)
   let seq = [rar.key];
@@ -59,7 +82,7 @@ export function startPull() {
   if (rar.key === 'ultra') seq = ['hero', 'legend', 'ultra'];
   if (rar.key === 'hero' && Math.random() < .35) seq = ['super', 'hero'];
   const cap = makeCapsule(RAR[seq[0]].hex);
-  pull = { phase: 'crank', t: 0, rar, w, isNew, seq, stage: 0, cap, lastTick: -1 };
+  pull = { phase: 'crank', t: 0, rar, w, prize, seq, stage: 0, cap, lastTick: -1 };
   $('pullBtn').disabled = true; $('pullbar').style.opacity = 0; $('pullSkip').hidden = false;
   return true;
 }
@@ -177,7 +200,7 @@ export function openCapsule() {
     { m: bot, v: new V3(1.6, 1.0, .6), r: new V3(3, 0, -4) },
   ];
   const rk = p.rar.rank, col = p.rar.key === 'ultra' ? 'rainbow' : p.rar.hex;
-  p.weapon = buildWeapon(p.w, 1.75); p.weapon.position.copy(R); p.weapon.scale.setScalar(0); scene.add(p.weapon);
+  p.weapon = p.prize ? buildPrize(p.prize) : buildWeapon(p.w, 1.75); p.weapon.position.copy(R); p.weapon.scale.setScalar(0); scene.add(p.weapon);
   if (rk >= 2) { p.rays = makeRays(p.rar.hex, p.rar.key === 'ultra'); p.rays.position.set(R.x, R.y, R.z - .9); scene.add(p.rays); }
   burst(R, col, [50, 90, 150, 240, 420][rk], [1.8, 2.6, 3.2, 4.2, 5.5][rk], rk >= 3 ? .12 : .09);
   if (rk >= 3) setTimeout(() => pull && burst(R, col, 200, 6, .1), 250);
@@ -193,27 +216,17 @@ export function showResult() {
   el.style.setProperty('--rc', p.rar.color);
   $('resRar').innerHTML = '<i class="cap-ic"></i>' + p.rar.name;
   $('resRar').classList.toggle('ultra-c', p.rar.key === 'ultra');
-  $('resName').innerHTML = p.w.name + (p.isNew ? '<span class="newb">NEW!</span>' : '');
-  $('resDesc').innerHTML = p.w.desc + `<br><span class="own">${state.inv[p.w.id]}개 보유</span> · 전투 Lv.${armLevel(p.w.id)}`;
+  if (p.prize) {
+    $('resName').textContent = prizeName(p.prize);
+    $('resDesc').textContent = `${p.rar.name} 무기를 지금 기계에서 모두 모아서 대신 받았어요.`;
+  } else {
+    $('resName').innerHTML = p.w.name + '<span class="newb">NEW!</span>';
+    $('resDesc').innerHTML = p.w.desc + '<br>도감에서 조각으로 전투 레벨을 올릴 수 있어요.';
+  }
   $('btnAgain').disabled = !FREE && state.coins < 1;
-  updateDismBtn();
   el.classList.add('show'); $('pullbar').style.opacity = 0;
   if (auto.on) autoNext(p);
 }
-// 결과 카드: 이미 갖고 있던 희귀/초희귀면 바로 분해할 수 있게
-function updateDismBtn() {
-  const w = pull.w, b = $('btnDism'), n = spare(w);
-  b.hidden = !n;
-  if (n) b.textContent = `분해 +${SHARD_VALUE[w.r]} 조각`;
-}
-$('btnDism').onclick = () => {
-  if (!pull || pull.phase !== 'show') return;
-  const got = dismantle(pull.w, 1); if (!got) return;
-  SFX.thud(); toast(`조각 ${got}개를 얻었어요 (총 ${state.shards}개)`);
-  $('btnDism').hidden = true;
-  $('resDesc').querySelector('.own').textContent = `${state.inv[pull.w.id]}개 보유`;
-  $('resDesc').lastChild.textContent = ` · 전투 Lv.${armLevel(pull.w.id)}`;
-};
 export function closeResult(again) {
   if (!pull || pull.phase !== 'show') return;
   if (!again && auto.on) setAuto(false); // 직접 닫으면 자동 뽑기도 멈춤
@@ -233,15 +246,14 @@ export function finishPull() {
 /* =========================================================
    자동 뽑기: 결과를 잠깐 보여 주고 바로 다음 뽑기 (연출은 빠르게)
    - 정한 등급 이상이 나오거나 코인이 떨어지면 멈춘다
-   - 원하면 남는 희귀·초희귀를 그 자리에서 분해한다
    ========================================================= */
 const AUTO_KEY = 'engpit_auto';
 export const auto = (() => {
-  const a = { on: false, stop: 'legend', dism: false, timer: 0 };
+  const a = { on: false, stop: 'legend', timer: 0 };
   try { Object.assign(a, JSON.parse(localStorage.getItem(AUTO_KEY)), { on: false }); } catch (e) {}
   return a;
 })();
-const saveAuto = () => { try { localStorage.setItem(AUTO_KEY, JSON.stringify({ stop: auto.stop, dism: auto.dism })); } catch (e) {} };
+const saveAuto = () => { try { localStorage.setItem(AUTO_KEY, JSON.stringify({ stop: auto.stop })); } catch (e) {} };
 export function setAuto(on, why) {
   auto.on = on; clearTimeout(auto.timer);
   $('autoBtn').classList.toggle('on', on);
@@ -250,10 +262,6 @@ export function setAuto(on, why) {
   if (on && !pull && !upgrading && !startPull()) setAuto(false);
 }
 function autoNext(p) {
-  if (auto.dism && spare(p.w)) { // 남는 것 바로 분해
-    dismantle(p.w, spare(p.w)); $('btnDism').hidden = true;
-    $('resDesc').querySelector('.own').textContent = `${state.inv[p.w.id]}개 보유 (분해함, 조각 ${state.shards}개)`;
-  }
   if (auto.stop && p.rar.rank >= RAR[auto.stop].rank) return setAuto(false, `${p.rar.name}! 자동 뽑기를 멈췄어요`);
   if (!FREE && state.coins < 1) return setAuto(false, '코인이 다 떨어져서 자동 뽑기를 멈췄어요');
   auto.timer = setTimeout(() => { if (auto.on && pull?.phase === 'show') closeResult(true); }, 900);
@@ -263,12 +271,9 @@ $('autoBtn').onclick = () => setAuto(!auto.on);
 $('autoOpt').onclick = () => $('autoOpt').closest('.autobox').classList.toggle('open');
 $('autoStop').value = auto.stop;
 $('autoStop').onchange = e => { auto.stop = e.target.value; saveAuto(); };
-$('autoDism').checked = auto.dism;
-$('autoDism').onchange = e => { auto.dism = e.target.checked; saveAuto(); };
 
 /* =========================================================
    한 번에 뽑기 (10회·100회): 연출 없이 결과를 모아서 보여 준다
-   - 자동 뽑기 설정의 "남는 희귀·초희귀 바로 분해"를 켜 두면 남는 것은 바로 분해
    ========================================================= */
 export let multi = null;
 export function pullMany(n) {
@@ -280,24 +285,24 @@ export function pullMany(n) {
   }
   if (auto.on) setAuto(false);
   ac();
-  const got = {}, count = {};
-  let best = RAR.rare, fresh = 0, shards = 0;
+  const list = [], count = {}, prize = { coins: 0, shards: 0 };
+  let best = RAR.rare;
   for (let i = 0; i < n; i++) {
     const r = rollOne();
-    const g = got[r.w.id] ||= { w: r.w, rar: r.rar, n: 0, isNew: false };
-    g.n++; count[r.rar.key] = (count[r.rar.key] || 0) + 1;
-    if (r.isNew) { g.isNew = true; fresh++; }
+    count[r.rar.key] = (count[r.rar.key] || 0) + 1;
+    if (r.prize) prize[r.prize.kind] += r.prize.n; else list.push(r);
     if (r.rar.rank > best.rank) best = r.rar;
   }
-  if (auto.dism) for (const g of Object.values(got)) shards += dismantle(g.w, spare(g.w));
   save(); updateHUD(); renderOdds();
   multi = { n };
-  const list = Object.values(got).sort((a, b) => b.rar.rank - a.rar.rank || b.n - a.n);
+  list.sort((a, b) => b.rar.rank - a.rar.rank);
   $('mBest').innerHTML = `${n}회 뽑기 · 최고 <span class="${best.key === 'ultra' ? 'ultra-c' : ''}" style="color:${best.color}">${best.name}</span>`;
   $('mSum').innerHTML = [...RARITIES].reverse().filter(r => count[r.key]).map(r => `<span style="--rc:${r.color}"><i></i>${r.name} ${count[r.key]}</span>`).join('') +
-    (fresh ? `<span class="new">NEW ${fresh}</span>` : '') + (shards ? `<span>분해 +${shards} 조각</span>` : '');
-  $('mGrid').innerHTML = list.map(g => `<div class="mcard" style="--rc:${g.rar.color}">${g.isNew ? '<span class="newb">NEW</span>' : ''}
-    <img src="${thumb(g.w, true)}" alt=""><b>${g.w.name}</b><small>×${g.n} · Lv.${armLevel(g.w.id)}</small></div>`).join('');
+    (list.length ? `<span class="new">새 무기 ${list.length}</span>` : '') +
+    (prize.coins ? `<span class="new">코인 +${prize.coins}</span>` : '') + (prize.shards ? `<span class="new">조각 +${prize.shards}</span>` : '');
+  $('mGrid').innerHTML = list.length ? list.map(g => `<div class="mcard" style="--rc:${g.rar.color}"><span class="newb">NEW</span>
+    <img src="${thumb(g.w, true)}" alt=""><b>${g.w.name}</b><small>${g.rar.name}</small></div>`).join('')
+    : '<p class="mnone">새 무기는 없었어요. 나올 수 있는 무기를 다 모은 등급은 코인과 조각으로 받았어요.</p>';
   $('mAgain').innerHTML = `${n}회 더 <i class="ci"></i>${n}`;
   $('mAgain').disabled = !FREE && state.coins < n;
   $('multi').classList.add('show'); $('pullbar').style.opacity = 0;

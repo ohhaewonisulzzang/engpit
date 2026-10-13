@@ -52,7 +52,7 @@ export function renderBattle() {
     </div>
     <div class="bl-label">장착한 무기 <small>${eq.length}/${MAX_EQUIP}${eq.length ? ' · 갤럭시 파워도 여기서 착용할 수 있어요' : ' · 비어 있으면 맨주먹으로 싸워요'}</small></div>
     <div class="slots">${Array.from({ length: MAX_EQUIP }, (_, i) => slot(eq[i])).join('')}</div>
-    <div class="bl-label">가진 무기 <small>같은 무기를 많이 가지거나 도감에서 조각을 쓰면 전투 레벨이 올라요 (최대 ${MAX_ARM_LV})</small></div>
+    <div class="bl-label">가진 무기 <small>도감에서 조각으로 전투 레벨을 올려요 (최대 ${MAX_ARM_LV})</small></div>
     <div class="armgrid">${owned.length ? owned.map(card).join('') : '<p class="bl-empty">아직 무기가 없어요. 뽑기에서 무기를 뽑아 오세요.</p>'}</div>
     <div class="bl-go"><span>이동: WASD·방향키 또는 화면을 누르고 끌기 · 일시정지: Esc</span><button class="btn primary" id="bStart">출격하기</button></div>
   </div>`;

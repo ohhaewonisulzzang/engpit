@@ -654,3 +654,4 @@ main{margin-bottom:var(--navh)}
 .tchip{background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--coin);border:1px solid color-mix(in srgb,var(--coin) 50%,transparent);border-radius:999px;padding:4px 10px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
 .tchip[hidden]{display:none}
 @media (max-width:699px){.tchip{display:none}}
+.mnone{grid-column:1/-1;margin:20px 0;color:var(--muted);font-size:14px;text-align:center}

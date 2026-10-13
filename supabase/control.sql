@@ -12,7 +12,7 @@ delete from public.wave_rank where user_id = 'ec1f0abf-2310-4dd3-9fb2-8a6f2d4ad9
 create table if not exists public.account_control (
   user_id     uuid        primary key references public.profiles (id) on delete cascade,
   rev         integer     not null default 0,   -- 대시보드가 저장할 때마다 1씩 올라감
-  patch       jsonb,                            -- 게임에 적용할 값 { coins, inv, armUp, galaxy, best }
+  patch       jsonb,                            -- 게임에 적용할 값 { coins, shards, inv, armUp, galaxy, best }
   applied_rev integer     not null default 0,   -- 게임이 적용했다고 알려 온 rev
   snapshot    jsonb,                            -- 게임이 올린 지금 상태
   snapshot_at timestamptz,

@@ -27,7 +27,10 @@ export const state = (() => {
   } catch (e) {}
   return DEFAULT();
 })();
-export function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
+// 저장할 때마다 부를 함수 (관리 계정이 바뀐 상태를 서버에 바로 올릴 때 씀, control.js)
+const saveHooks = new Set();
+export const onSave = f => saveHooks.add(f);
+export function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} saveHooks.forEach(f => f()); }
 
 // 랭킹 시즌: 한국 시간 기준 한 달 ("2026-10")
 export const monthKey = (d = new Date()) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 7);
