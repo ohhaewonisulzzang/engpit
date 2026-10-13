@@ -53,13 +53,12 @@ export function sprite(w) {
 }
 export function renderDex() {
   const owned = WEAPONS.filter(w => state.inv[w.id]).length;
-  const acc = state.correct + state.wrong ? Math.round(state.correct / (state.correct + state.wrong) * 100) : 0;
   renderMachine();
   renderForge();
   renderShop();
   updateHUD();
   $('dexStats').innerHTML = [
-    [`${owned}/${WEAPONS.length}`, '모은 무기'], [state.pulls, '뽑은 횟수'], [state.correct, '맞힌 문제'], [acc + '%', '정답률'],
+    [`${owned}/${WEAPONS.length}`, '모은 무기'], [state.pulls, '뽑은 횟수'],
   ].map(([b, s]) => `<div><b>${b}</b>${s}</div>`).join('');
   $('dexGrid').innerHTML = [...WEAPONS].reverse().map(w => {
     const r = RAR[w.r], n = state.inv[w.id] || 0;
