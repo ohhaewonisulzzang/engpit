@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
+import { TIERS, TIER_COINS } from '../words.js';
 import { RAR, RARITIES, MAX_LEVEL, LEVELS, LUCK_MAX, SHOP, chanceOf, pct, machineCost } from '../config.js';
 import { buyLuck, luckMaxed, nextLuckCost, machineMaxed, payMachine, buyWeapon, poolOf, freshOf } from '../forge.js';
 import { toast, renderOdds, switchTab, updateHUD } from './common.js';
@@ -119,7 +120,7 @@ function renderMachine() {
   const now = oddsWith(at(state.level)), next = maxed ? now : oddsWith(at(state.level + 1));
   const nextEx = maxed ? [] : WEAPONS.filter(w => w.m === state.level + 1);
   $('lvProg').innerHTML = `<div class="fg-head">
-      <div><b>뽑기 기계 Lv.${state.level} ${LEVELS[state.level - 1].name}</b><p>${maxed ? '모든 기계를 열었어요. 전용 칼 12종이 모두 나와요.' : `조각으로 ${LEVELS[state.level].name}를 열면 높은 등급 확률은 조금 낮아지지만, 전용 칼 ${nextEx.length}종(${nextEx.map(w => RAR[w.r].name).join('·')})이 새로 나오기 시작해요. 전용 칼은 그 기계 이상이면 계속 나와요.`}</p></div>
+      <div><b>뽑기 기계 Lv.${state.level} ${LEVELS[state.level - 1].name}</b><p>${maxed ? '모든 기계를 열었어요. 전용 칼 12종이 모두 나와요.' : `조각으로 ${LEVELS[state.level].name}를 열면 높은 등급 확률은 조금 낮아지지만, 전용 칼 ${nextEx.length}종(${nextEx.map(w => RAR[w.r].name).join('·')})이 새로 나오기 시작해요. 전용 칼은 그 기계 이상이면 계속 나와요. 단어 테스트도 ${TIERS[state.level]} 단계로 어려워지고, 맞히면 받는 코인이 ${TIER_COINS[state.level]}개가 돼요.`}</p></div>
       <div class="fg-stats"><div><b>${state.level}<small>/${MAX_LEVEL}</small></b>기계</div></div>
     </div>
     ${maxed ? '' : `<div class="bar"><i style="width:${Math.min(1, state.shards / cost) * 100}%"></i></div>${oddsRow(now, next)}`}

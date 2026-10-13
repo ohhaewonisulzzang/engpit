@@ -1,9 +1,9 @@
 import { $ } from '../dom.js';
-import { monthKey, SUPER, SLOT_KEY } from '../state.js';
+import { state, save, monthKey, SUPER, SLOT_KEY } from '../state.js';
 import { TEST_MODE } from '../config.js';
 import { SFX } from '../sound.js';
-import { rankReady, session, onAuth, signUp, logIn, logOut, authError, ID_RULE, fetchTop, fetchMine } from '../ranking.js';
-import { toast, esc, currentTab, leaveLogin } from './common.js';
+import { rankReady, session, onAuth, signUp, logIn, logOut, authError, ID_RULE, fetchTop, fetchMine, fetchChampMonths } from '../ranking.js';
+import { toast, esc, currentTab, leaveLogin, updateHUD } from './common.js';
 import { renderProfile } from './profile.js';
 
 /* =========================================================
@@ -51,7 +51,19 @@ function fitAcct() {
 }
 addEventListener('resize', fitAcct);
 document.fonts?.ready.then(fitAcct); // 웹폰트가 늦게 오면 글자 폭이 바뀌므로 한 번 더
-onAuth(() => { if (syncSlot()) return; renderAcct(); if (currentTab === 'rank') renderRanking(); if (currentTab === 'login') renderLogin(); });
+/* ---------- 랭킹 1위 칭호 ----------
+   지난 달 랭킹을 1위로 마쳤으면 state.champ에 그 달을 적는다. 칭호와 보상은 updateHUD의 checkTitles가 준다 */
+async function checkChamp() {
+  if (!session) return;
+  try {
+    const won = await fetchChampMonths(state.champ || []);
+    if (!won.length) return;
+    state.champ = [...(state.champ || []), ...won]; save(); updateHUD();
+  } catch (e) {}
+}
+setTimeout(checkChamp, 1500); // 첫 화면이 다 뜬 뒤에
+
+onAuth(() => { if (syncSlot()) return; checkChamp(); renderAcct(); if (currentTab === 'rank') renderRanking(); if (currentTab === 'login') renderLogin(); });
 renderAcct();
 
 /* ---------- 로그인 / 회원가입 화면 ---------- */

@@ -18,6 +18,7 @@
     <button data-tab="battle"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg><span>전투</span></button>
     <button data-tab="word"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M8 7h8M8 11h5"/></svg><span>단어</span></button>
     <button data-tab="dex"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>도감</span></button>
+    <button data-tab="store"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span>상점</span></button>
     <button data-tab="rank"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg><span>랭킹</span></button>
   </nav>
   <div class="top-right">
@@ -155,7 +156,7 @@
         </div>
       </div>
       <div class="feedback" id="feedback"></div>
-      <p class="note">맞힐 때마다 코인 <i class="ci"></i> 1개, 5문제 연속으로 맞히면 보너스 1개를 더 받아요.</p>
+      <p class="note" id="testNote"></p>
     </div>
   </section>
 
@@ -167,6 +168,15 @@
       <div class="forge" id="shop"></div>
       <div class="dex-stats" id="dexStats"></div>
       <div class="dex-grid" id="dexGrid"></div>
+    </div>
+  </section>
+
+  <!-- 코인 상점: 캐릭터 스킨, 배경 테마, 효과음, 칭호 -->
+  <section id="tab-store" class="tab page">
+    <div class="wrap">
+      <div class="st-head" id="storeHead"></div>
+      <div class="st-bar"><div class="seg" id="storeSeg"></div><span id="storeNote"></span></div>
+      <div class="st-grid" id="storeGrid"></div>
     </div>
   </section>
 

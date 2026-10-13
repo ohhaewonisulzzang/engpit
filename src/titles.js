@@ -31,9 +31,21 @@ export const TITLES = [
   { id: 'max1',     name: '한 우물',        desc: `무기 1종 전투 Lv.${MAX_ARM_LV}`, now: maxed, goal: 1, shards: 60 },
   { id: 'max5',     name: '무기고 관리인',  desc: `무기 5종 전투 Lv.${MAX_ARM_LV}`, now: maxed, goal: 5, shards: 250 },
   { id: 'galaxy1',  name: '별을 품은 자',   desc: '갤럭시 파워 1개 해금',      now: galaxies, goal: 1, shards: 40 },
+  { id: 'champ',    name: '랭킹 1위',       desc: '한 달 전투 랭킹을 1위로 마치기 (로그인 필요)', now: () => (state.champ || []).length, goal: 1, coins: 100, shards: 300, gold: true },
   { id: 'machine',  name: '기계공',         desc: '모든 뽑기 기계 열기',       now: () => state.level, goal: MAX_LEVEL, shards: 100 },
 ];
-export const TITLE = Object.fromEntries(TITLES.map(t => [t.id, t]));
+// 코인 상점에서 사는 칭호 (shop.js). 조건 없이 사면 바로 얻는다
+export const SHOP_TITLES = [
+  { id: 's_cat',    name: '고양이 집사',     price: 40,  desc: '야옹' },
+  { id: 's_rich',   name: '코인 부자',       price: 60,  desc: '코인이 넘쳐나요' },
+  { id: 's_night',  name: '밤샘 공부러',     price: 80,  desc: '밤에도 단어 공부' },
+  { id: 's_genius', name: '영어 천재',       price: 120, desc: '모르는 단어가 없어요' },
+  { id: 's_lucky',  name: '행운의 주인공',   price: 150, desc: '오늘은 울트라가 나올 것 같아' },
+  { id: 's_dragon', name: '드래곤 슬레이어', price: 200, desc: '보스도 두렵지 않아' },
+  { id: 's_legend', name: '살아있는 전설',   price: 300, desc: '모두가 아는 그 이름' },
+  { id: 's_king',   name: '단어의 왕',       price: 500, desc: '단어 나라의 임금님' },
+];
+export const TITLE = Object.fromEntries([...TITLES, ...SHOP_TITLES].map(t => [t.id, t]));
 
 export const hasTitle = t => !!state.titles?.[t.id];
 export const rewardText = t => [t.coins && `코인 ${t.coins}`, t.shards && `조각 ${t.shards}`].filter(Boolean).join(' · ');

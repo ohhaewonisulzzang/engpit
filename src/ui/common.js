@@ -12,10 +12,11 @@ import { curQ, nextQuestion } from './test.js';
 import { renderDex } from './dex.js';
 import { renderBattle, leaveBattle } from './battle.js';
 import { renderRanking, renderLogin } from './ranking.js';
+import { renderStore } from './store.js';
 
 /* =========================================================
    UI 공통
-   - 화면(tab): gacha, battle, study, test, dex, rank, login
+   - 화면(tab): gacha, battle, study, test, dex, store, rank, login
    - 위쪽 메뉴의 "단어"는 study/test 중 마지막에 본 화면으로 간다 (단어 탭 안에서 둘을 오감)
    ========================================================= */
 export let currentTab = 'gacha';
@@ -55,6 +56,7 @@ export function switchTab(tab) {
   if (tab === 'dex') renderDex();
   if (tab === 'battle') renderBattle();
   if (tab === 'rank') renderRanking();
+  if (tab === 'store') renderStore();
   if (tab === 'login') renderLogin();
 }
 let toastT;
@@ -74,17 +76,18 @@ export function updateHUD() {
   }
   const t = TITLE[state.title];
   $('titleChip').hidden = !t; if (t) $('titleChip').textContent = t.name;
+  $('titleChip').classList.toggle('gold', !!t?.gold);
   $('pullHint').innerHTML = broke
     ? '코인이 없어요. <b>단어 테스트</b>에서 한 문제 맞히면 1개를 받아요'
     : matchMedia('(hover: hover)').matches ? '스페이스바를 눌러도 뽑을 수 있어요' : '';
 }
-export function gainCoin(fromEl) {
-  state.coins++; save(); updateHUD();
+export function gainCoin(fromEl, n = 1, quiet = false) {
+  state.coins += n; save(); updateHUD();
   const cb = $('coinBox'); cb.classList.remove('bump'); void cb.offsetWidth; cb.classList.add('bump');
   const r = (fromEl || cb).getBoundingClientRect(), s = document.createElement('div');
-  s.className = 'plus'; s.innerHTML = '+1 <i class="ci"></i>'; s.style.left = (r.left + r.width / 2 - 30) + 'px'; s.style.top = (r.top) + 'px';
+  s.className = 'plus'; s.innerHTML = `+${n} <i class="ci"></i>`; s.style.left = (r.left + r.width / 2 - 30) + 'px'; s.style.top = (r.top) + 'px';
   document.body.appendChild(s); setTimeout(() => s.remove(), 1000);
-  SFX.coin();
+  if (!quiet) SFX.coin();
 }
 // 뽑기 화면 왼쪽 위: 기계, 다음 업그레이드 가격, 확률표, 지금 뽑을 수 있는 기계 전용 칼
 // (좁은 화면에서는 제목만 보이고 눌러야 펼쳐진다)

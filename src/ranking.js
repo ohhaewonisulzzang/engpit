@@ -1,4 +1,5 @@
 import { RANKING, TEST_MODE } from './config.js';
+import { monthKey } from './state.js';
 
 /* =========================================================
    회원(아이디 + 비밀번호)과 월간 전투 랭킹 (Supabase REST)
@@ -117,6 +118,18 @@ export function setCtl(on) { if (session && !!session.ctl !== on) setSession({ .
 const ORDER = 'order=wave.desc,kills.desc,updated_at.asc';
 export async function fetchTop(month, limit = 50) {
   return (await req(`/rest/v1/wave_rank_view?month=eq.${month}&select=user_id,username,wave,kills&${ORDER}&limit=${limit}`)).data;
+}
+// 내가 1위로 마친 지난 달 (이번 달은 아직 안 끝났으니 빼고, known에 있는 달은 다시 안 봄)
+export async function fetchChampMonths(known = []) {
+  if (!rankReady() || !session) return [];
+  const mine = (await req(`/rest/v1/wave_rank_view?user_id=eq.${session.uid}&month=lt.${monthKey()}&select=month`)).data || [];
+  const won = [];
+  for (const { month } of mine) {
+    if (known.includes(month)) continue;
+    const [top] = await fetchTop(month, 1);
+    if (top?.user_id === session.uid) won.push(month);
+  }
+  return won;
 }
 export async function fetchMine(month) {
   if (!session) return null;

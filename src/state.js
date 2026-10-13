@@ -18,6 +18,9 @@ export const DEFAULT = () => ({
   pity: { legend: 0, ultra: 0 }, // 그 등급 이상이 안 나온 채로 뽑은 횟수 (천장)
   titles: {},  // 보상을 받은 칭호 { 칭호 id: true }
   title: null, // 대표 칭호 id
+  champ: [],   // 전투 랭킹을 1위로 마친 달 ['2026-10'] (칭호 '랭킹 1위')
+  shop: {},    // 상점에서 산 것 { 'skin:gold': true } (칭호는 titles에)
+  skin: 'basic', theme: 'basic', sfx: 'basic', // 쓰는 중인 캐릭터 스킨·배경 테마·정답 효과음 (shop.js)
   ctlRev: 0,   // 관리 계정: 대시보드에서 바꾼 값을 몇 번째까지 적용했는지 (control.js)
 });
 export const state = (() => {

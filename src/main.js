@@ -12,6 +12,8 @@ import { loop } from './gacha.js';
 import { applyMachineTheme } from './three/machine.js';
 import { updateHUD, renderOdds } from './ui/common.js';
 import { syncControl } from './control.js';
+import { applyTheme } from './shop.js';
+import './ui/store.js';
 
 // 예전 저장 데이터 옮기기: 같은 무기 여러 개로 오르던 전투 레벨을 조각 단계(armUp)로 바꾸고,
 // 최대 레벨을 넘던 개수는 조각으로 돌려준다. 이제 무기는 하나씩만 가진다
@@ -36,6 +38,7 @@ if (SUPER) {
 }
 
 applyMachineTheme(state.level);
+applyTheme();
 renderOdds();
 updateHUD();
 loop();

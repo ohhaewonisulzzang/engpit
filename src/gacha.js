@@ -10,6 +10,7 @@ import { machine, topBulbM, domeCaps, bulbs, crank, btnM, flap, machineFx, apply
 import { dimmer, makeRays, burst, updateBursts } from './three/effects.js';
 import { currentTab, toast, updateHUD, renderOdds } from './ui/common.js';
 import { grant, freshOf } from './forge.js';
+import { TIERS, curTier } from './words.js';
 import { pv, renderPreview, thumb } from './ui/dex.js';
 
 /* =========================================================
@@ -354,7 +355,7 @@ function updateUpgrade(dt) {
   } else if (u.t >= 4) {
     $('banner').className = 'banner';
     upgrading = null; $('pullBtn').disabled = false; $('pullbar').style.opacity = 1;
-    toast(`Lv.${state.level} ${lvl().name}: 이제부터 전용 칼 3종이 더 나와요!`);
+    toast(`Lv.${state.level} ${lvl().name}: 전용 칼 3종이 더 나오고, 단어 테스트는 ${TIERS[curTier()]} 단계로 어려워져요!`);
     u.done?.();
   }
 }
