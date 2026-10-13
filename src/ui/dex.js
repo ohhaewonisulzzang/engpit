@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
-import { RAR, RARITIES, MAX_LEVEL, LEVELS, LUCK_MAX, SHARD_VALUE, chanceOf, pct, machineCost } from '../config.js';
-import { canDismantle, spare, spareShards, dismantle, dismantleAll, buyLuck, luckMaxed, nextLuckCost, machineMaxed, payMachine } from '../forge.js';
-import { toast, renderOdds, switchTab } from './common.js';
+import { RAR, RARITIES, MAX_LEVEL, LEVELS, LUCK_MAX, SHARD_VALUE, SHOP, chanceOf, pct, machineCost } from '../config.js';
+import { canDismantle, spare, spareShards, dismantle, dismantleAll, buyLuck, luckMaxed, nextLuckCost, machineMaxed, payMachine, buyWeapon, poolOf } from '../forge.js';
+import { toast, renderOdds, switchTab, updateHUD } from './common.js';
 import { upgradeMachine } from '../gacha.js';
-import { armLevel, ARMS, KIND_NAME, lvMult, MAX_ARM_LV, galaxyState } from '../battle/data.js';
+import { armLevel, armUpCost, buyArmUp, ARMS, KIND_NAME, lvMult, MAX_ARM_LV, galaxyState } from '../battle/data.js';
 import { galaxyHTML, bindGalaxy } from './galaxy.js';
 import { SFX } from '../sound.js';
 import { basic, disposeObj, makeEnv } from '../three/helpers.js';
@@ -55,13 +55,15 @@ export function renderDex() {
   const acc = state.correct + state.wrong ? Math.round(state.correct / (state.correct + state.wrong) * 100) : 0;
   renderMachine();
   renderForge();
+  renderShop();
+  updateHUD();
   $('dexStats').innerHTML = [
     [`${owned}/${WEAPONS.length}`, '모은 무기'], [state.pulls, '뽑은 횟수'], [state.correct, '맞힌 문제'], [acc + '%', '정답률'],
   ].map(([b, s]) => `<div><b>${b}</b>${s}</div>`).join('');
   $('dexGrid').innerHTML = [...WEAPONS].reverse().map(w => {
     const r = RAR[w.r], n = state.inv[w.id] || 0;
     return `<div class="dcard${n ? ' owned' : ''}" style="--rc:${r.color}" data-id="${w.id}">
-      ${n ? `<span class="cnt">×${n}</span><span class="here">전투 Lv.${armLevel(n)}${galaxyState(w) === 'on' ? ' ✦' : ''}</span>` : ''}
+      ${n ? `<span class="cnt">×${n}</span><span class="here">전투 Lv.${armLevel(w.id)}${galaxyState(w) === 'on' ? ' ✦' : ''}</span>` : ''}
       <img src="${thumb(w, !!n)}" alt="">
       <div class="rl${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</div>
       <div class="nm">${n ? w.name : '아직 못 뽑음'}</div>${w.m ? `<div class="mtag" style="--mc:${LEVELS[w.m - 1].color}">${LEVELS[w.m - 1].name} 이상</div>` : ''}</div>`;
@@ -136,7 +138,7 @@ function renderForge() {
   const preview = maxed ? '<p>행운이 최대예요.</p>' : oddsRow(now, next);
   $('forge').innerHTML = `
     <div class="fg-head">
-      <div><b>분해와 행운</b><p>남는 희귀·초희귀를 분해하거나 전투에서 적을 잡으면 조각이 나와요. 조각으로 행운을 올리면 모든 기계에서 좋은 등급이 조금씩 더 잘 나와요. 분해하면 그 무기의 전투 레벨은 내려가요.</p></div>
+      <div><b>분해와 행운</b><p>남는 희귀·초희귀, 전투 레벨이 최대를 넘어 남는 영웅 이상 무기를 분해하거나 전투에서 적을 잡으면 조각이 나와요. 조각으로 행운을 올리면 모든 기계에서 좋은 등급이 조금씩 더 잘 나와요. 희귀·초희귀는 분해하면 그 무기의 전투 레벨이 내려가요.</p></div>
       <div class="fg-stats"><div><b>${state.shards}</b>조각</div><div><b>${state.luck}<small>/${LUCK_MAX}</small></b>행운</div></div>
     </div>
     ${preview}
@@ -154,18 +156,44 @@ function renderForge() {
   };
 }
 
+/* ---------- 조각 교환소: 영웅 이상 무기를 확정으로 ---------- */
+function renderShop() {
+  const rows = ['hero', 'legend', 'ultra'].map(k => {
+    const r = RAR[k], pool = poolOf(k), have = pool.filter(w => state.inv[w.id]).length;
+    return `<button class="btn shop-b" data-shop="${k}" style="--rc:${r.color}" ${state.shards < SHOP[k] ? 'disabled' : ''}>
+      <span class="${k === 'ultra' ? 'ultra-c' : ''}"><i class="cap-ic"></i>${r.name} 확정</span><b>조각 ${SHOP[k]}</b><small>${have}/${pool.length}종 보유</small></button>`;
+  }).join('');
+  $('shop').innerHTML = `<div class="fg-head">
+      <div><b>조각 교환소</b><p>조각으로 그 등급 무기 하나를 확정으로 받아요. 아직 없는 무기가 먼저 나오고, 다 모았으면 전투 레벨이 가장 낮은 무기가 나와요. 기계 전용 칼은 지금 기계에서 나오는 것만 받을 수 있어요.</p></div>
+      <div class="fg-stats"><div><b>${state.shards}</b>조각</div></div>
+    </div><div class="shop-row">${rows}</div>`;
+}
+$('shop').onclick = e => {
+  const b = e.target.closest('[data-shop]'); if (!b) return;
+  const got = buyWeapon(b.dataset.shop);
+  if (!got) { SFX.wrong(); toast('조각이 모자라요'); return; }
+  SFX.fanfare(RAR[got.w.r].rank);
+  toast(`${RAR[got.w.r].name} 「${got.w.name}」${got.isNew ? ' NEW!' : ` · 전투 Lv.${armLevel(got.w.id)}`}`);
+  renderDex(); renderOdds();
+};
+
 // 상세창이 열려 있는 무기 (갤럭시 파워를 바꾸면 다시 그림)
 let modalW = null;
 bindGalaxy($('pvInfo'), () => { if (modalW) renderModalInfo(modalW); renderDex(); });
 function renderModalInfo(w) {
   modalW = w;
   const r = RAR[w.r], sp = spare(w), v = SHARD_VALUE[w.r];
-  const lv = armLevel(state.inv[w.id]), d = ARMS[w.id];
-  $('pvInfo').innerHTML = `<span class="rlabel${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span><h2>${w.name}</h2><p>${w.desc}<br>${w.m ? `<b style="color:${LEVELS[w.m - 1].color}">${LEVELS[w.m - 1].name} 이상에서 뽑을 수 있어요</b><br>` : ''}${state.inv[w.id]}개 보유 · 전투 Lv.${lv}/${MAX_ARM_LV} · ${KIND_NAME[d.kind]} · 공격력 ${Math.round(d.dmg * lvMult(lv))}</p>` + galaxyHTML(w) +
+  const lv = armLevel(w.id), d = ARMS[w.id], upCost = armUpCost(w), lvMax = lv >= MAX_ARM_LV;
+  $('pvInfo').innerHTML = `<span class="rlabel${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span><h2>${w.name}</h2><p>${w.desc}<br>${w.m ? `<b style="color:${LEVELS[w.m - 1].color}">${LEVELS[w.m - 1].name} 이상에서 뽑을 수 있어요</b><br>` : ''}${state.inv[w.id]}개 보유 · 전투 Lv.${lv}/${MAX_ARM_LV} · ${KIND_NAME[d.kind]} · 공격력 ${Math.round(d.dmg * lvMult(lv))}</p>
+    <div class="fg-btns"><button class="btn primary" id="armUp" ${lvMax || state.shards < upCost ? 'disabled' : ''}>${lvMax ? '전투 레벨 최대' : `전투 레벨 올리기 (조각 ${state.shards}/${upCost})`}</button></div>` + galaxyHTML(w) +
     (canDismantle(w) ? `<div class="fg-btns">
       <button class="btn" id="dismOne" ${sp ? '' : 'disabled'}>1개 분해 (+${v} 조각)</button>
-      <button class="btn" id="dismRest" ${sp > 1 ? '' : 'disabled'}>1개만 남기고 분해${sp > 1 ? ` (+${sp * v} 조각)` : ''}</button>
-    </div>${sp ? '' : '<p class="fg-note">1개뿐이라 분해할 수 없어요.</p>'}` : '');
+      <button class="btn" id="dismRest" ${sp > 1 ? '' : 'disabled'}>남는 것 모두 분해${sp > 1 ? ` (+${sp * v} 조각)` : ''}</button>
+    </div>${sp ? '' : `<p class="fg-note">${w.r === 'rare' || w.r === 'super' ? '1개뿐이라 분해할 수 없어요.' : `전투 Lv.${MAX_ARM_LV}을 넘어서 남는 것만 분해할 수 있어요.`}</p>`}` : '');
+  $('armUp').onclick = () => {
+    if (!buyArmUp(w)) return;
+    save(); SFX.up(2); toast(`${w.name} 전투 Lv.${armLevel(w.id)}!`); renderModalInfo(w); renderDex();
+  };
   if (!canDismantle(w)) return;
   const act = n => { const got = dismantle(w, n); if (!got) return; SFX.thud(); toast(`조각 ${got}개를 얻었어요 (총 ${state.shards}개)`); renderModalInfo(w); renderDex(); };
   $('dismOne').onclick = () => act(1);

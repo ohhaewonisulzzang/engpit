@@ -23,7 +23,7 @@ export function equipped() {
   state.equip = state.equip.filter(id => state.inv[id]).slice(0, MAX_EQUIP);
   return state.equip;
 }
-const power = id => Math.round(ARMS[id].dmg * lvMult(armLevel(state.inv[id])));
+const power = id => Math.round(ARMS[id].dmg * lvMult(armLevel(id)));
 
 /* ---------- 로비 ---------- */
 export function renderBattle() {
@@ -35,7 +35,7 @@ export function renderBattle() {
     const w = byId(id);
     // 장착 칸: 무기 정보 + 갤럭시 파워 착용/해금
     return `<div class="slot" style="--rc:${RAR[w.r].color}"><div class="slot-main"><img src="${thumb(w, true)}" alt="">
-      <div><b>${w.name}</b><small>전투 Lv.${armLevel(state.inv[id])} · ${KIND_NAME[ARMS[id].kind]} · 공격력 ${power(id)}</small></div>
+      <div><b>${w.name}</b><small>전투 Lv.${armLevel(id)} · ${KIND_NAME[ARMS[id].kind]} · 공격력 ${power(id)}</small></div>
       <button class="out" data-un="${id}" aria-label="${w.name} 빼기">빼기</button></div>${galaxyHTML(w, true)}</div>`;
   };
   const card = w => {
@@ -43,7 +43,7 @@ export function renderBattle() {
     return `<button class="acard${on ? ' on' : ''}" style="--rc:${r.color}" data-eq="${w.id}">
       ${on ? '<em>장착 중</em>' : ''}<img src="${thumb(w, true)}" alt="">
       <span class="rl${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span>
-      <b>${w.name}</b><small>Lv.${armLevel(state.inv[w.id])} · ${KIND_NAME[ARMS[w.id].kind]}${galaxyOn(w.id) ? ' · ✦' : ''}</small></button>`;
+      <b>${w.name}</b><small>Lv.${armLevel(w.id)} · ${KIND_NAME[ARMS[w.id].kind]}${galaxyOn(w.id) ? ' · ✦' : ''}</small></button>`;
   };
   $('bLobby').innerHTML = `<div class="bl-box">
     <div class="bl-head">
@@ -52,7 +52,7 @@ export function renderBattle() {
     </div>
     <div class="bl-label">장착한 무기 <small>${eq.length}/${MAX_EQUIP}${eq.length ? ' · 갤럭시 파워도 여기서 착용할 수 있어요' : ' · 비어 있으면 맨주먹으로 싸워요'}</small></div>
     <div class="slots">${Array.from({ length: MAX_EQUIP }, (_, i) => slot(eq[i])).join('')}</div>
-    <div class="bl-label">가진 무기 <small>같은 무기를 많이 가질수록 전투 레벨이 올라요 (최대 ${MAX_ARM_LV})</small></div>
+    <div class="bl-label">가진 무기 <small>같은 무기를 많이 가지거나 도감에서 조각을 쓰면 전투 레벨이 올라요 (최대 ${MAX_ARM_LV})</small></div>
     <div class="armgrid">${owned.length ? owned.map(card).join('') : '<p class="bl-empty">아직 무기가 없어요. 뽑기에서 무기를 뽑아 오세요.</p>'}</div>
     <div class="bl-go"><span>이동: WASD·방향키 또는 화면을 누르고 끌기 · 일시정지: Esc</span><button class="btn primary" id="bStart">출격하기</button></div>
   </div>`;

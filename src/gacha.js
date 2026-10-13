@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { $ } from './dom.js';
 import { state, save } from './state.js';
-import { RARITIES, RAR, FREE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE } from './config.js';
+import { RARITIES, RAR, FREE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE, PITY } from './config.js';
 import { ac, SFX } from './sound.js';
 import { V3, glow, disposeObj, U } from './three/helpers.js';
 import { buildWeapon, WEAPONS } from './three/weapons.js';
@@ -9,9 +9,9 @@ import { stage, renderer, scene, camera, CAM_HOME, LOOK_HOME, CAM_FOCUS, LOOK_FO
 import { machine, topBulbM, domeCaps, bulbs, crank, btnM, flap, machineFx, applyMachineTheme, updateMachine } from './three/machine.js';
 import { dimmer, makeRays, burst, updateBursts } from './three/effects.js';
 import { currentTab, toast, updateHUD, renderOdds } from './ui/common.js';
-import { spare, dismantle } from './forge.js';
-import { pv, renderPreview } from './ui/dex.js';
-import { armLevel, MAX_EQUIP } from './battle/data.js';
+import { spare, dismantle, grant } from './forge.js';
+import { pv, renderPreview, thumb } from './ui/dex.js';
+import { armLevel } from './battle/data.js';
 
 /* =========================================================
    뽑기 진행
@@ -21,19 +21,19 @@ export const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 
 export const easeOut = t => 1 - Math.pow(1 - t, 3);
 export const elastic = t => t === 0 ? 0 : t >= 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - .75) * (2 * Math.PI) / 3) + 1;
 
+// 천장(PITY): 정한 횟수 안에 레전더리 이상/울트라가 안 나오면 이번에 확정
 export function rollRarity() {
-  let r = Math.random() * 100;
-  for (let i = RARITIES.length - 1; i >= 0; i--) { r -= chanceOf(RARITIES[i].key); if (r < 0) return RAR[RARITIES[i].key]; }
-  return RAR.rare;
+  let r = Math.random() * 100, got = RAR.rare;
+  for (let i = RARITIES.length - 1; i >= 0; i--) { r -= chanceOf(RARITIES[i].key); if (r < 0) { got = RAR[RARITIES[i].key]; break; } }
+  const p = state.pity;
+  if (p.ultra + 1 >= PITY.ultra) got = RAR.ultra;
+  else if (p.legend + 1 >= PITY.legend && got.rank < RAR.legend.rank) got = RAR.legend;
+  p.ultra = got.key === 'ultra' ? 0 : p.ultra + 1;
+  p.legend = got.rank >= RAR.legend.rank ? 0 : p.legend + 1;
+  return got;
 }
-export function startPull() {
-  if (pull || upgrading) return false;
-  if (!FREE && state.coins < 1) {
-    toast('코인이 없어요. 단어 테스트에서 한 문제 맞힐 때마다 1개씩 받을 수 있어요.');
-    $('coinBox').classList.remove('shake'); void $('coinBox').offsetWidth; $('coinBox').classList.add('shake');
-    SFX.wrong(); return false;
-  }
-  ac();
+// 코인 1개로 한 번 뽑아서 무기를 넣는다 (연출 없이 결과만)
+function rollOne() {
   if (!FREE) state.coins--;
   state.pulls++;
   const rar = rollRarity();
@@ -41,10 +41,17 @@ export function startPull() {
   const ex = WEAPONS.filter(w => w.m && w.m <= state.level && w.r === rar.key);
   const pool = ex.length && Math.random() < EXCLUSIVE_CHANCE ? ex : WEAPONS.filter(w => !w.m && w.r === rar.key);
   const w = pool[Math.floor(Math.random() * pool.length)];
-  const isNew = !state.inv[w.id];
-  state.inv[w.id] = (state.inv[w.id] || 0) + 1;
-  // 처음 뽑은 무기는 전투 장착 칸이 비어 있으면 바로 장착
-  if (isNew && Array.isArray(state.equip) && state.equip.length < MAX_EQUIP) state.equip.push(w.id);
+  return { rar, w, isNew: grant(w) };
+}
+export function startPull() {
+  if (pull || upgrading || multi) return false;
+  if (!FREE && state.coins < 1) {
+    toast('코인이 없어요. 단어 테스트에서 한 문제 맞힐 때마다 1개씩 받을 수 있어요.');
+    $('coinBox').classList.remove('shake'); void $('coinBox').offsetWidth; $('coinBox').classList.add('shake');
+    SFX.wrong(); return false;
+  }
+  ac();
+  const { rar, w, isNew } = rollOne();
   save(); updateHUD(); renderOdds();
   // 캡슐 색 연출 (높은 등급은 낮은 색에서 승급!)
   let seq = [rar.key];
@@ -53,8 +60,19 @@ export function startPull() {
   if (rar.key === 'hero' && Math.random() < .35) seq = ['super', 'hero'];
   const cap = makeCapsule(RAR[seq[0]].hex);
   pull = { phase: 'crank', t: 0, rar, w, isNew, seq, stage: 0, cap, lastTick: -1 };
-  $('pullBtn').disabled = true; $('pullbar').style.opacity = 0;
+  $('pullBtn').disabled = true; $('pullbar').style.opacity = 0; $('pullSkip').hidden = false;
   return true;
+}
+// 연출 건너뛰기: 캡슐이 열리기 전이면 바로 결과로
+export function skipPull() {
+  const p = pull; if (!p || !['crank', 'drop', 'rise', 'charge'].includes(p.phase)) return;
+  crank.rotation.z = 0; machine.position.x = 0; flap.rotation.x = 0;
+  if (!p.cap.parent) scene.add(p.cap);
+  p.cap.position.copy(R); p.cap.rotation.set(0, 0, 0); p.cap.scale.setScalar(2.3);
+  setCapColor(p.seq[p.seq.length - 1]);
+  if (!p.capGlow) { p.capGlow = glow(RAR[p.capKey].hex, 1.2, .8); p.cap.add(p.capGlow); }
+  dimmer.material.opacity = .75;
+  openCapsule();
 }
 export function setCapColor(key) { pull.capKey = key; pull.cap.userData.topM.color.setHex(RAR[key].hex); if (pull.capGlow) pull.capGlow.material.color.setHex(RAR[key].hex); }
 
@@ -148,7 +166,7 @@ export function updatePull(dt, t) {
   }
 }
 export function openCapsule() {
-  const p = pull; p.phase = 'show'; p.t = 0;
+  const p = pull; p.phase = 'show'; p.t = 0; $('pullSkip').hidden = true;
   const { top, bot } = p.cap.userData;
   p.cap.remove(p.capGlow); disposeObj(p.capGlow);
   scene.attach(top); scene.attach(bot); scene.remove(p.cap);
@@ -176,7 +194,7 @@ export function showResult() {
   $('resRar').innerHTML = '<i class="cap-ic"></i>' + p.rar.name;
   $('resRar').classList.toggle('ultra-c', p.rar.key === 'ultra');
   $('resName').innerHTML = p.w.name + (p.isNew ? '<span class="newb">NEW!</span>' : '');
-  $('resDesc').innerHTML = p.w.desc + `<br><span class="own">${state.inv[p.w.id]}개 보유</span> · 전투 Lv.${armLevel(state.inv[p.w.id])}`;
+  $('resDesc').innerHTML = p.w.desc + `<br><span class="own">${state.inv[p.w.id]}개 보유</span> · 전투 Lv.${armLevel(p.w.id)}`;
   $('btnAgain').disabled = !FREE && state.coins < 1;
   updateDismBtn();
   el.classList.add('show'); $('pullbar').style.opacity = 0;
@@ -194,7 +212,7 @@ $('btnDism').onclick = () => {
   SFX.thud(); toast(`조각 ${got}개를 얻었어요 (총 ${state.shards}개)`);
   $('btnDism').hidden = true;
   $('resDesc').querySelector('.own').textContent = `${state.inv[pull.w.id]}개 보유`;
-  $('resDesc').lastChild.textContent = ` · 전투 Lv.${armLevel(state.inv[pull.w.id])}`;
+  $('resDesc').lastChild.textContent = ` · 전투 Lv.${armLevel(pull.w.id)}`;
 };
 export function closeResult(again) {
   if (!pull || pull.phase !== 'show') return;
@@ -249,10 +267,60 @@ $('autoDism').checked = auto.dism;
 $('autoDism').onchange = e => { auto.dism = e.target.checked; saveAuto(); };
 
 /* =========================================================
+   한 번에 뽑기 (10회·100회): 연출 없이 결과를 모아서 보여 준다
+   - 자동 뽑기 설정의 "남는 희귀·초희귀 바로 분해"를 켜 두면 남는 것은 바로 분해
+   ========================================================= */
+export let multi = null;
+export function pullMany(n) {
+  if (pull || upgrading) return;
+  if (!FREE && state.coins < n) {
+    toast(`코인이 ${n}개 필요해요 (지금 ${state.coins}개)`);
+    $('coinBox').classList.remove('shake'); void $('coinBox').offsetWidth; $('coinBox').classList.add('shake');
+    SFX.wrong(); return;
+  }
+  if (auto.on) setAuto(false);
+  ac();
+  const got = {}, count = {};
+  let best = RAR.rare, fresh = 0, shards = 0;
+  for (let i = 0; i < n; i++) {
+    const r = rollOne();
+    const g = got[r.w.id] ||= { w: r.w, rar: r.rar, n: 0, isNew: false };
+    g.n++; count[r.rar.key] = (count[r.rar.key] || 0) + 1;
+    if (r.isNew) { g.isNew = true; fresh++; }
+    if (r.rar.rank > best.rank) best = r.rar;
+  }
+  if (auto.dism) for (const g of Object.values(got)) shards += dismantle(g.w, spare(g.w));
+  save(); updateHUD(); renderOdds();
+  multi = { n };
+  const list = Object.values(got).sort((a, b) => b.rar.rank - a.rar.rank || b.n - a.n);
+  $('mBest').innerHTML = `${n}회 뽑기 · 최고 <span class="${best.key === 'ultra' ? 'ultra-c' : ''}" style="color:${best.color}">${best.name}</span>`;
+  $('mSum').innerHTML = [...RARITIES].reverse().filter(r => count[r.key]).map(r => `<span style="--rc:${r.color}"><i></i>${r.name} ${count[r.key]}</span>`).join('') +
+    (fresh ? `<span class="new">NEW ${fresh}</span>` : '') + (shards ? `<span>분해 +${shards} 조각</span>` : '');
+  $('mGrid').innerHTML = list.map(g => `<div class="mcard" style="--rc:${g.rar.color}">${g.isNew ? '<span class="newb">NEW</span>' : ''}
+    <img src="${thumb(g.w, true)}" alt=""><b>${g.w.name}</b><small>×${g.n} · Lv.${armLevel(g.w.id)}</small></div>`).join('');
+  $('mAgain').innerHTML = `${n}회 더 <i class="ci"></i>${n}`;
+  $('mAgain').disabled = !FREE && state.coins < n;
+  $('multi').classList.add('show'); $('pullbar').style.opacity = 0;
+  if (best.rank >= 2) flashScreen();
+  SFX.pop(); setTimeout(() => SFX.fanfare(best.rank), 80);
+}
+export function closeMulti(again) {
+  if (!multi) return;
+  const n = multi.n; multi = null;
+  $('multi').classList.remove('show'); $('pullbar').style.opacity = 1;
+  if (again) pullMany(n);
+}
+$('pull10').onclick = () => pullMany(10);
+$('pull100').onclick = () => pullMany(100);
+$('mOk').onclick = () => closeMulti(false);
+$('mAgain').onclick = () => closeMulti(true);
+$('pullSkip').onclick = skipPull;
+
+/* =========================================================
    기계 업그레이드 연출: 덜덜 떨림 → 번쩍 하면서 새 기계로 바뀜
    ========================================================= */
 export function upgradeMachine(done) {
-  if (pull || upgrading || state.level >= MAX_LEVEL) return;
+  if (pull || upgrading || multi || state.level >= MAX_LEVEL) return;
   state.level++; save();
   $('pullBtn').disabled = true; $('pullbar').style.opacity = 0;
   upgrading = { t: 0, swapped: false, done };
@@ -293,7 +361,7 @@ $('btnAgain').onclick = () => closeResult(true);
 
 // 공개된 무기 드래그 회전
 export let dragging = false, lastX = 0;
-renderer.domElement.addEventListener('pointerdown', e => { if (pull?.phase === 'show') { dragging = true; lastX = e.clientX; } });
+renderer.domElement.addEventListener('pointerdown', e => { if (pull?.phase === 'show') { dragging = true; lastX = e.clientX; } else skipPull(); });
 addEventListener('pointermove', e => { if (dragging && pull?.weapon) { pull.weapon.rotation.y += (e.clientX - lastX) * .012; lastX = e.clientX; } });
 addEventListener('pointerup', () => dragging = false);
 

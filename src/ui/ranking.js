@@ -4,6 +4,7 @@ import { TEST_MODE } from '../config.js';
 import { SFX } from '../sound.js';
 import { rankReady, session, onAuth, signUp, logIn, logOut, authError, ID_RULE, fetchTop, fetchMine } from '../ranking.js';
 import { toast, esc, currentTab, leaveLogin } from './common.js';
+import { renderProfile } from './profile.js';
 
 /* =========================================================
    로그인 화면(tab-login)과 랭킹 화면(tab-rank)
@@ -20,11 +21,12 @@ function untilReset() {
 const MEDAL = ['#ffc83d', '#c9d3dc', '#d08a4a'];
 const rec = r => `<span class="rk-sh">${r.wave}<small>웨이브</small></span><span class="rk-k">처치 ${r.kills.toLocaleString()}</span>`;
 
-/* ---------- 슈퍼계정 전용 저장 ----------
+/* ---------- 슈퍼계정·관리 계정 전용 저장 ----------
    슈퍼계정으로 로그인하면 'engpit_save_super_<id>'에 따로 저장하고(무한 코인, 전부 해금),
+   관리 계정은 'engpit_save_ctl_<id>'에 따로 저장한다(대시보드에서 바꾼 값을 받음, control.js).
    로그아웃하면 원래 저장으로 돌아간다. 바뀔 때는 새로고침해서 처음부터 다시 불러온다 */
 export function syncSlot() {
-  const want = session?.super ? 'super_' + session.uid : null;
+  const want = session?.super ? 'super_' + session.uid : session?.ctl ? 'ctl_' + session.uid : null;
   const have = (() => { try { return localStorage.getItem(SLOT_KEY); } catch (e) { return null; } })();
   if (want === have) return false;
   try { want ? localStorage.setItem(SLOT_KEY, want) : localStorage.removeItem(SLOT_KEY); } catch (e) { return false; }
@@ -55,6 +57,7 @@ renderAcct();
 /* ---------- 로그인 / 회원가입 화면 ---------- */
 let mode = 'login', busyAuth = false;
 export function renderLogin() {
+  renderProfile();
   const box = $('loginBox');
   if (session) {
     box.innerHTML = `<div class="auth-card">

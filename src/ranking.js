@@ -59,12 +59,13 @@ export async function logIn(id, pw) {
   const { data } = await req('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: toEmail(id), password: pw } });
   setSession(await withProfile(fromAuth(data)));
 }
-// 서버 프로필에서 아이디(대소문자 그대로)와 슈퍼계정 여부를 붙인다
+// 서버 프로필에서 아이디(대소문자 그대로)와 슈퍼계정·관리 계정 여부를 붙인다
 async function withProfile(s) {
   try {
     const rows = (await req(`/rest/v1/profiles?id=eq.${s.uid}&select=username,is_super,hide_rank`, { token: s.token })).data;
     if (rows?.[0]) { s.username = rows[0].username; s.super = !!rows[0].is_super; s.hideRank = !!rows[0].hide_rank; }
   } catch (e) {}
+  try { s.ctl = !!(await req('/rest/v1/rpc/ctl_sync', { method: 'POST', token: s.token, body: {} })).data; } catch (e) {}
   return s;
 }
 export function logOut() {
@@ -77,7 +78,7 @@ async function token() {
   if (Date.now() < session.exp) return session.token;
   try {
     const { data } = await req('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh } });
-    setSession({ ...fromAuth(data, session.username), super: session.super, hideRank: session.hideRank });
+    setSession({ ...fromAuth(data, session.username), super: session.super, hideRank: session.hideRank, ctl: session.ctl });
     return session.token;
   } catch (e) { if (e.status === 400 || e.status === 401) setSession(null); return null; }
 }
@@ -102,6 +103,16 @@ export async function submitWave(wave, kills) {
   await req('/rest/v1/rpc/submit_wave', { method: 'POST', token: t, body: { p_run: id, p_wave: wave, p_kills: kills } });
   return session.hideRank ? 'hidden' : 'ok';
 }
+
+// 관리 계정: 지금 상태를 올리고, 대시보드에서 바꾼 값 { rev, patch }을 받는다 (관리 계정이 아니면 null, 실패하면 undefined)
+export async function ctlSync(snapshot, rev) {
+  if (!rankReady() || !session) return undefined;
+  const t = await token(); if (!t) return undefined;
+  try { return (await req('/rest/v1/rpc/ctl_sync', { method: 'POST', token: t, body: { p_snapshot: snapshot, p_rev: rev } })).data; }
+  catch (e) { return undefined; }
+}
+// 관리 계정 여부가 바뀌면 저장 칸을 바꾸도록 알린다 (onAuth → syncSlot)
+export function setCtl(on) { if (session && !!session.ctl !== on) setSession({ ...session, ctl: on }); }
 
 const ORDER = 'order=wave.desc,kills.desc,updated_at.asc';
 export async function fetchTop(month, limit = 50) {

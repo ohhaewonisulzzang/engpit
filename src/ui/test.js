@@ -2,7 +2,7 @@ import { $ } from '../dom.js';
 import { state, save } from '../state.js';
 import { allWords } from '../words.js';
 import { SFX } from '../sound.js';
-import { pull, startPull, closeResult } from '../gacha.js';
+import { pull, multi, startPull, closeResult, skipPull, closeMulti } from '../gacha.js';
 import { currentTab, gainCoin, speak, esc } from './common.js';
 import { closeModal } from './dex.js';
 
@@ -115,7 +115,7 @@ $('best').textContent = best();
 addEventListener('keydown', e => {
   if (currentTab === 'test' && e.key === 'Enter' && curQ?.done) { e.preventDefault(); nextQuestion(); return; }
   if (e.target.tagName === 'INPUT') return;
-  if (currentTab === 'gacha' && e.code === 'Space') { e.preventDefault(); if (pull?.phase === 'show') closeResult(false); else startPull(); }
+  if (currentTab === 'gacha' && e.code === 'Space') { e.preventDefault(); if (multi) closeMulti(false); else if (pull?.phase === 'show') closeResult(false); else if (pull) skipPull(); else startPull(); }
   if (currentTab === 'gacha' && e.key === 'Enter' && pull?.phase === 'show') closeResult(false);
   if (currentTab === 'study') { if (e.key === 'ArrowRight') $('fcNext').click(); if (e.key === 'ArrowLeft') $('fcPrev').click(); }
   if (e.key === 'Escape') closeModal();

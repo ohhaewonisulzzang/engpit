@@ -1,7 +1,8 @@
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
 import { SFX } from '../sound.js';
-import { RARITIES, TEST_MODE, FREE, MAX_LEVEL, lvl, chanceOf, pct, machineCost } from '../config.js';
+import { RARITIES, TEST_MODE, FREE, MAX_LEVEL, lvl, chanceOf, pct, machineCost, PITY } from '../config.js';
+import { TITLE, checkTitles, rewardText } from '../titles.js';
 import { WEAPONS } from '../three/weapons.js';
 import { resize } from '../three/effects.js';
 import { pull, upgrading, closeResult, clock, upgradeMachine, auto, setAuto } from '../gacha.js';
@@ -27,6 +28,7 @@ document.addEventListener('click', e => {
   switchTab(t === 'word' ? wordTab : t);
 });
 $('acctBtn').onclick = () => switchTab('login');
+$('titleChip').onclick = () => switchTab('login');
 // 로그인 화면을 닫으면 원래 보던 화면으로
 export const leaveLogin = () => switchTab(backTab === 'login' ? 'rank' : backTab);
 export function switchTab(tab) {
@@ -46,7 +48,8 @@ export function switchTab(tab) {
   $('acctBtn').classList.toggle('active', tab === 'login');
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
   document.querySelector('main').scrollTop = 0;
-  if (tab === 'gacha') { resize(); clock.getDelta(); }
+  if (tab === 'gacha') { resize(); clock.getDelta(); renderOdds(); }
+  updateHUD();
   if (tab === 'test') { if (!curQ) nextQuestion(); else if (!curQ.done) $('ans').focus(); }
   if (tab === 'study') renderStudy();
   if (tab === 'dex') renderDex();
@@ -61,6 +64,16 @@ export function updateHUD() {
   $('coinNum').textContent = FREE ? '∞' : state.coins;
   $('coinBox').title = TEST_MODE ? '테스트 모드: 코인 무한' : FREE ? '슈퍼계정: 코인 무한' : '보유 코인';
   $('pullBtn').classList.toggle('broke', broke);
+  $('pull10').classList.toggle('broke', !FREE && state.coins < 10);
+  $('pull100').classList.toggle('broke', !FREE && state.coins < 100);
+  // 새로 달성한 칭호는 저절로 얻고, 대표 칭호를 위에 보여 준다
+  const got = checkTitles();
+  if (got.length) {
+    toast(got.length > 1 ? `칭호 「${got[0].name}」 외 ${got.length - 1}개 획득!` : `칭호 「${got[0].name}」 획득! ${rewardText(got[0])}`);
+    $('coinNum').textContent = FREE ? '∞' : state.coins;
+  }
+  const t = TITLE[state.title];
+  $('titleChip').hidden = !t; if (t) $('titleChip').textContent = t.name;
   $('pullHint').innerHTML = broke
     ? '코인이 없어요. <b>단어 테스트</b>에서 한 문제 맞히면 1개를 받아요'
     : matchMedia('(hover: hover)').matches ? '스페이스바를 눌러도 뽑을 수 있어요' : '';
@@ -83,7 +96,7 @@ export function renderOdds() {
   const ex = WEAPONS.filter(w => w.m && w.m <= state.level);
   $('odds').classList.toggle('open', oddsOpen);
   $('odds').innerHTML = `<button class="odds-sum" id="oddsSum"><b>Lv.${state.level} ${lvl().name}</b><span class="odds-more">확률 보기</span></button>
-    <div class="odds-body"><small class="odds-next">${next}</small>${state.luck ? `<small class="luck">행운 ${state.luck}단계 적용 중</small>` : ''}` +
+    <div class="odds-body"><small class="odds-next">${next}</small>${state.luck ? `<small class="luck">행운 ${state.luck}단계 적용 중</small>` : ''}<small class="pity">레전더리 이상 확정까지 <b>${PITY.legend - state.pity.legend}</b>회 · 울트라 확정까지 <b>${PITY.ultra - state.pity.ultra}</b>회</small>` +
     [...RARITIES].reverse().map(r => `<div class="orow"><span><i style="background:${r.color}"></i>${r.name}</span><span>${pct(chanceOf(r.key))}%</span></div>`).join('') +
     (ex.length ? `<div class="mex"><b>기계 전용 칼 ${ex.length}종이 나와요</b><span>${ex.filter(w => state.inv[w.id]).length}종 획득 · 도감에서 확인</span></div>` : '') +
     (TEST_MODE ? '<div class="testbar"><button id="tUp">테스트: 기계 업그레이드</button><button id="tReset">1레벨로</button><button id="tShard">조각 +100</button><button id="tAll">무기 전부 열기</button></div>' : '') + '</div>';

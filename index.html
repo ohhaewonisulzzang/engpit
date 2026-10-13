@@ -25,6 +25,7 @@
     <svg class="ic on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
     <svg class="ic off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
   </button>
+  <button class="tchip" id="titleChip" hidden></button>
   <button class="acct" id="acctBtn">로그인</button>
   <div class="coin" id="coinBox" title="보유 코인"><i class="ci"></i><b id="coinNum">0</b></div>
   </div>
@@ -49,12 +50,22 @@
             <option value="ultra">울트라</option>
           </select>
         </label>
-        <label class="chk"><input type="checkbox" id="autoDism">남는 희귀·초희귀 바로 분해</label>
+        <label class="chk"><input type="checkbox" id="autoDism">남는 무기 바로 분해</label>
         </div>
       </div>
       <div class="pullbar" id="pullbar">
-        <button class="pull" id="pullBtn"><b>뽑기</b><small><i class="ci"></i>1</small></button>
+        <div class="pullrow">
+          <button class="btn mpull" id="pull10"><b>10회</b><small><i class="ci"></i>10</small></button>
+          <button class="pull" id="pullBtn"><b>뽑기</b><small><i class="ci"></i>1</small></button>
+          <button class="btn mpull" id="pull100"><b>100회</b><small><i class="ci"></i>100</small></button>
+        </div>
         <div class="hint" id="pullHint"></div>
+      </div>
+      <button class="btn skip" id="pullSkip" hidden>건너뛰기 ›</button>
+      <div class="multi" id="multi">
+        <div class="mhead"><b id="mBest"></b><div class="msum" id="mSum"></div></div>
+        <div class="mgrid" id="mGrid"></div>
+        <div class="rbtns"><button class="btn" id="mOk">확인</button><button class="btn primary" id="mAgain"></button></div>
       </div>
       <div class="result" id="result">
         <span class="rlabel" id="resRar"></span>
@@ -155,6 +166,7 @@
     <div class="wrap">
       <div class="lvprog" id="lvProg"></div>
       <div class="forge" id="forge"></div>
+      <div class="forge" id="shop"></div>
       <div class="dex-stats" id="dexStats"></div>
       <div class="dex-grid" id="dexGrid"></div>
     </div>
@@ -163,6 +175,7 @@
   <!-- 로그인 / 회원가입 -->
   <section id="tab-login" class="tab page">
     <div class="wrap narrow" id="loginBox"></div>
+    <div class="wrap narrow" id="profile"></div>
   </section>
 
   <!-- 랭킹: 이번 달 전투 최고 웨이브 -->

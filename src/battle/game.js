@@ -73,7 +73,7 @@ export function startRun(ids) {
 function makeArm(id) {
   const w = WEAPONS.find(x => x.id === id);
   return {
-    id, w, d: ARMS[id], lv: w ? armLevel(state.inv[id]) : 1,
+    id, w, d: ARMS[id], lv: w ? armLevel(id) : 1,
     col: w ? RAR[w.r].color : '#f3efe6', img: w ? sprite(w) : null,
     cd: Math.random() * .4, ang: Math.random() * TAU, hits: new WeakMap(), gp: galaxyOn(id),
   };

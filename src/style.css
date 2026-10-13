@@ -607,3 +607,50 @@ main{margin-bottom:var(--navh)}
   .hint{display:none}
   .result{width:min(380px,calc(100% - 32px))}
 }
+
+/* ---------- 한 번에 뽑기 · 건너뛰기 ---------- */
+.pullrow{display:flex;align-items:center;gap:26px}
+.mpull{pointer-events:auto;flex-direction:column;gap:0;padding:8px 14px;min-width:68px;background:var(--surface);box-shadow:0 4px 0 #0a2a2e}
+.mpull b{font-size:15px;font-weight:800}
+.mpull small{font-family:var(--round);font-size:12px;display:flex;align-items:center;gap:3px;color:var(--coin)}
+.mpull.broke{opacity:.45}
+.pity{display:block;font-size:12px}
+.pity b{color:var(--coin);font-family:var(--round);font-weight:600}
+.skip{position:absolute;right:24px;bottom:28px;z-index:3;background:rgba(11,47,51,.85);font-size:14px}
+.skip[hidden]{display:none}
+.multi{position:absolute;inset:16px;margin:auto;max-width:760px;max-height:calc(100% - 32px);display:flex;flex-direction:column;gap:14px;background:rgba(11,47,51,.96);border:1px solid var(--line);border-radius:18px;padding:18px 20px;opacity:0;pointer-events:none;transform:translateY(16px);transition:.25s;z-index:4;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.multi.show{opacity:1;pointer-events:auto;transform:none}
+.mhead b{font-size:20px;font-weight:800}
+.msum{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px;font-size:13px;color:var(--muted)}
+.msum span i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--rc);margin-right:6px;vertical-align:1px}
+.msum .new{color:var(--coin);font-weight:700}
+.mgrid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;align-content:start}
+.mcard{position:relative;background:var(--surface);border-radius:12px;padding:6px 8px 8px;border-top:3px solid var(--rc);text-align:center}
+.mcard img{width:100%;aspect-ratio:1;display:block;background:radial-gradient(circle,color-mix(in srgb,var(--rc) 35%,transparent),transparent 62%)}
+.mcard b{display:block;font-size:12px;line-height:1.3;word-break:keep-all}
+.mcard small{font-size:11px;color:var(--muted);font-family:var(--round)}
+.mcard .newb{position:absolute;top:6px;left:6px;margin:0}
+@media (max-width:699px){.pullrow{gap:16px}.mpull{min-width:58px;padding:7px 10px}.skip{right:var(--gut,16px);bottom:auto;top:64px}}
+
+/* ---------- 조각 교환소 · 칭호 ---------- */
+.shop-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.shop-b{flex-direction:column;align-items:flex-start;gap:2px;background:var(--surface);border-left:4px solid var(--rc);text-align:left}
+.shop-b span{font-size:14px;color:var(--rc)}
+.shop-b b{font-family:var(--round);font-size:18px;color:var(--coin)}
+.shop-b small{font-size:12px;color:var(--muted);font-weight:500}
+@media (max-width:520px){.shop-row{grid-template-columns:1fr}}
+.tlist{display:flex;flex-direction:column;gap:6px}
+.trow{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--bg2);border-radius:10px;padding:9px 12px}
+.trow b{font-size:14px}
+.trow small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.trow.todo b{color:var(--muted)}
+.trow .btn{font-size:13px;padding:7px 12px;flex:none}
+.trow .btn:not(.on){background:var(--surface)}
+.trow .btn.on{background:var(--good);color:#06291a}
+.prof{margin-top:16px}
+.prof h3{margin:0;font-size:20px}
+.prof .auth-sub{margin:0}
+.prof-cur{color:var(--coin)}
+.tchip{background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--coin);border:1px solid color-mix(in srgb,var(--coin) 50%,transparent);border-radius:999px;padding:4px 10px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.tchip[hidden]{display:none}
+@media (max-width:699px){.tchip{display:none}}

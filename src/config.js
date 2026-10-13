@@ -41,7 +41,13 @@ export const EXCLUSIVE_CHANCE = .4;
 
 // 분해와 행운: 남는 희귀/초희귀를 분해하거나 전투에서 적을 잡으면 조각이 나오고, 조각으로 행운을 올리면
 // 높은 등급 확률이 조금씩 오른다 (오른 만큼 희귀 확률이 줄어듦)
-export const SHARD_VALUE = { rare: 1, super: 2 };           // 1개 분해할 때 나오는 조각
+// 희귀·초희귀는 1개만 남기고 분해, 영웅 이상은 전투 레벨이 최대를 넘는 만큼만 분해 (forge.js의 spare)
+export const SHARD_VALUE = { rare: 1, super: 2, hero: 8, legend: 20, ultra: 50 }; // 1개 분해할 때 나오는 조각
+
+// 천장: 이 횟수 안에 그 등급 이상이 한 번도 안 나오면 이번 뽑기에서 확정으로 나온다
+export const PITY = { legend: 30, ultra: 80 };
+// 조각 교환소: 조각으로 그 등급 무기 하나를 확정으로 얻는다 (안 가진 무기 먼저)
+export const SHOP = { hero: 40, legend: 120, ultra: 400 };
 export const LUCK_MAX = 10;
 export const LUCK_BOOST = { ultra: .08, legend: .06, hero: .05, super: .03 }; // 행운 1단계당 배율
 export const luckCost = luck => 4 + luck * 3;                 // 다음 행운 단계 가격
