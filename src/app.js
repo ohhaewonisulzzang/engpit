@@ -29,6 +29,9 @@ if (!state.oneEach) {
   state.oneEach = true; save();
 }
 
+// 하드 모드가 웨이브 1부터로 바뀌면서(2026-10-15) 프로랭킹을 초기화했으므로, 예전 방식의 하드 최고 기록도 한 번 지운다
+if (!state.hardV2) { state.proBest = null; state.hardV2 = true; save(); }
+
 // 슈퍼계정: 모든 무기 최대 레벨, 모든 기계·행운·갤럭시 파워 해금 (새 무기가 생겨도 시작할 때 채움)
 if (SUPER) {
   WEAPONS.forEach(w => { state.inv[w.id] = 1; });
