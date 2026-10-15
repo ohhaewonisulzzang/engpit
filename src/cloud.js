@@ -1,5 +1,5 @@
 import { state, CLOUD, FROM_GUEST, GUEST_KEY, SLOT_KEY, onSave, writeLocal, replaceState, lockSave } from './state.js';
-import { session, loadSave, putSave } from './ranking.js';
+import { session, loadSave, putSave, migrateSave } from './ranking.js';
 
 /* =========================================================
    계정별 서버 저장 (서버 규칙은 supabase/cloud_save.sql)
@@ -50,19 +50,24 @@ export async function cloudBoot() {
     }
   }
 }
-const dropGuest = () => { if (FROM_GUEST) try { localStorage.removeItem(GUEST_KEY); } catch (e) {} };
 async function first() {
-  const r = await loadSave();
-  // 이 브라우저의 예전 저장은 이 계정으로 옮겨졌거나(서버에 없을 때) 이 계정의 옛 사본이다(서버에 있을 때).
-  // 어느 쪽이든 지워서, 옛 사본을 로그아웃 상태나 새 계정으로 다시 쓰지 못하게 한다
-  if (!r) {
-    // 서버에 아직 저장이 없는 계정: 이 기기의 진행을 처음 올린다
-    const res = await putSave(0, data());
+  // 업데이트 전부터 이 브라우저에 있던 진행: 서버 것보다 많으면 계정 저장이 되고, 아니면 서버 것을 받는다.
+  // 어느 쪽이든 지워서, 같은 옛 진행을 로그아웃 상태나 다른 계정으로 다시 쓰지 못하게 한다
+  if (FROM_GUEST) {
+    const res = await migrateSave(data());
+    try { localStorage.removeItem(GUEST_KEY); } catch (e) {}
     if (!res.ok) return replaceState(res.data, res.rev);
-    state.cloudRev = res.rev; state.cloudDirty = false; writeLocal(); dropGuest();
+    state.cloudRev = res.rev; state.cloudDirty = false; writeLocal();
     return;
   }
-  dropGuest();
+  const r = await loadSave();
+  if (!r) {
+    // 서버에 아직 저장이 없는 계정: 이 기기의 진행을 처음 올린다 (나중에 진행이 더 많은 예전 기기가 오면 그걸로 바뀜)
+    const res = await putSave(0, data());
+    if (!res.ok) return replaceState(res.data, res.rev);
+    state.cloudRev = res.rev; state.cloudDirty = false; writeLocal();
+    return;
+  }
   // 이 기기에서 마지막으로 맞춘 뒤 다른 기기가 저장하지 않았고, 아직 못 올린 진행이 있으면 올린다
   if (r.rev === state.cloudRev && state.cloudDirty) {
     const res = await putSave(r.rev, data());

@@ -118,6 +118,7 @@ async function rpc(name, body, opts) {
   return (await req('/rest/v1/rpc/' + name, { method: 'POST', token: t, body, ...opts })).data;
 }
 export const loadSave = () => rpc('load_save', {});                         // { rev, data } | null
+export const migrateSave = data => rpc('migrate_save', { p_data: data });   // { ok, rev, data? }
 export const putSave = (rev, data, keepalive) => rpc('put_save', { p_rev: rev, p_data: data }, { keepalive }); // { ok, rev, data? }
 
 // 관리 계정 여부가 바뀌면 저장 칸을 바꾸도록 알린다 (onAuth → syncSlot)
