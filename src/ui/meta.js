@@ -4,13 +4,13 @@ import { RAR } from '../config.js';
 import { SFX } from '../sound.js';
 import { WEAPONS } from '../three/weapons.js';
 import { ARMS, KIND_NAME, MAX_EQUIP, armLevel, lvMult } from '../battle/data.js';
-import { metas, findMeta, saveMeta, deleteMeta, equipMeta, isWorn, MAX_METAS, NAME_MAX } from '../meta.js';
+import { metas, findMeta, saveMeta, deleteMeta, isWorn, MAX_METAS, NAME_MAX } from '../meta.js';
 import { thumb } from './dex.js';
 import { equipped } from './battle.js';
-import { toast, esc, switchTab } from './common.js';
+import { toast, esc } from './common.js';
 
 /* =========================================================
-   메타 화면(tab-meta): 위에서 무기 3개를 골라 이름을 붙여 저장하고, 아래 목록에서 눌러 장착한다
+   메타 화면(tab-meta): 무기 3개를 골라 이름을 붙여 저장하고 고치거나 지운다. 장착은 전투 탭에서 (ui/battle.js)
    ========================================================= */
 const byId = id => WEAPONS.find(w => w.id === id);
 const power = id => Math.round(ARMS[id].dmg * lvMult(armLevel(id)));
@@ -45,14 +45,12 @@ export function renderMeta() {
         return `<div class="mt-arm${have ? '' : ' gone'}" style="--rc:${RAR[w.r].color}"><img src="${thumb(w, have)}" alt=""><span>${have ? w.name : '없는 무기'}</span><small>${have ? `Lv.${armLevel(id)}` : ''}</small></div>`;
       }).join('')}</div>
       <div class="mt-btns">
-        <button class="btn primary" data-go="${m.id}">장착하고 전투로</button>
-        <button class="btn" data-wear="${m.id}" ${worn ? 'disabled' : ''}>장착</button>
         <button class="btn" data-edit="${m.id}">고치기</button>
         <button class="btn${sure ? ' danger' : ''}" data-del="${m.id}">${sure ? '정말 지울까요?' : '지우기'}</button>
       </div></div>`;
   };
   $('metaBox').innerHTML = `
-    <div class="mt-head"><div><h2>메타</h2><p>자주 쓰는 무기 3개 조합을 이름을 붙여 저장해 두고, 눌러서 바로 장착해요. 로그인하면 계정에 저장돼서 다른 기기에서도 그대로 써요.</p></div>
+    <div class="mt-head"><div><h2>메타</h2><p>자주 쓰는 무기 3개 조합을 이름을 붙여 저장해 두세요. 저장한 메타는 <b>전투</b> 탭에서 골라 장착하고 출격해요. 로그인하면 계정에 저장돼서 다른 기기에서도 그대로 써요.</p></div>
       <div class="mt-count"><b>${list.length}</b>/${MAX_METAS}</div></div>
     <div class="mt-edit">
       <div class="bl-label">${editId ? '메타 고치기' : '새 메타 만들기'} <small>가진 무기 중 ${MAX_EQUIP}개를 골라요</small></div>
@@ -64,7 +62,7 @@ export function renderMeta() {
         <button class="btn primary" id="metaSave" ${pick.length === MAX_EQUIP ? '' : 'disabled'}>${editId ? '고친 내용 저장' : '메타 저장'}${pick.length === MAX_EQUIP ? '' : ` (${pick.length}/${MAX_EQUIP})`}</button></div>
       <div class="armgrid">${owned.length ? owned.map(card).join('') : '<p class="bl-empty">아직 무기가 없어요. 뽑기에서 무기를 뽑아 오세요.</p>'}</div>`}
     </div>
-    <div class="bl-label">저장한 메타 <small>${list.length ? '누르면 장착 칸이 이 조합으로 바뀌어요' : ''}</small></div>
+    <div class="bl-label">저장한 메타 <small>${list.length ? '장착은 전투 탭에서 해요' : ''}</small></div>
     <div class="mt-list">${list.length ? list.map(metaCard).join('') : '<p class="bl-empty">아직 저장한 메타가 없어요. 위에서 무기 3개를 골라 저장해 보세요.</p>'}</div>`;
 }
 
@@ -91,13 +89,6 @@ $('metaBox').onclick = e => {
     if (res !== 'ok') { SFX.wrong(); toast(`가진 무기 ${MAX_EQUIP}개를 골라 주세요.`); return; }
     SFX.up(2); toast(editId ? '메타를 고쳤어요' : '메타를 저장했어요');
     resetEdit(); return renderMeta();
-  }
-  const wear = t.closest('[data-wear]'), go = t.closest('[data-go]');
-  if (wear || go) {
-    const m = findMeta((wear || go).dataset.wear || (wear || go).dataset.go);
-    const miss = equipMeta(m.id);
-    SFX.tick(); toast(`「${esc(m.name)}」 장착!${miss > 0 ? ` (없는 무기 ${miss}개는 빼고 장착했어요)` : ''}`);
-    return go ? switchTab('battle') : renderMeta();
   }
   const ed = t.closest('[data-edit]');
   if (ed) {

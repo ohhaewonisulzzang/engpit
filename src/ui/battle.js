@@ -4,7 +4,8 @@ import { RAR } from '../config.js';
 import { SFX } from '../sound.js';
 import { WEAPONS } from '../three/weapons.js';
 import { thumb } from './dex.js';
-import { toast } from './common.js';
+import { toast, esc } from './common.js';
+import { metas, equipMeta, isWorn } from '../meta.js';
 import { galaxyHTML, bindGalaxy } from './galaxy.js';
 import { beginRun, submitWave, submitPro, session, rankReady } from '../ranking.js';
 import { G, hooks, startRun, choosePerk, setPaused, quitRun, clearRun } from '../battle/game.js';
@@ -45,6 +46,16 @@ function hardHTML() {
   </div>`;
 }
 
+/* ---------- 메타 고르기: 메타 탭에서 만든 무기 3개 조합을 눌러 한 번에 장착 ---------- */
+function metaHTML(eq) {
+  const list = metas();
+  return `<div class="bl-label">메타 <small>${list.length ? '누르면 그 조합으로 장착해요' : ''}</small></div>
+    ${list.length ? `<div class="bmetas">${list.map(m => `<button class="bmeta${isWorn(m, eq) ? ' on' : ''}" data-meta="${m.id}">
+        <b>${esc(m.name)}</b><span>${m.arms.map(id => { const w = byId(id); return w ? `<img src="${thumb(w, !!state.inv[id])}" alt="${w.name}" title="${w.name}">` : ''; }).join('')}</span>
+        ${isWorn(m, eq) ? '<em>장착 중</em>' : ''}</button>`).join('')}</div>`
+      : '<p class="bmeta-empty">아직 메타가 없어요. <button class="btn" data-tab="meta">메타 만들러 가기</button></p>'}`;
+}
+
 /* ---------- 로비 ---------- */
 export function renderBattle() {
   if (G) return; // 전투 중이거나 결과 화면
@@ -70,6 +81,7 @@ export function renderBattle() {
       <div><h2>전투</h2><p>뽑은 무기로 몰려오는 적을 버텨요. ${WAVE_LEN}초를 버티면 보스가 나오고, 보스를 잡으면 효과를 하나 골라 더 강해져요. 적이 떨어뜨린 <i class="si"></i>조각으로 행운과 뽑기 기계를 업그레이드할 수 있어요.</p></div>
       <div class="bl-best"><b>${best ? best.wave : 0}</b>최고 웨이브</div>
     </div>
+    ${metaHTML(eq)}
     <div class="bl-label">장착한 무기 <small>${eq.length}/${MAX_EQUIP}${eq.length ? ' · 갤럭시 파워도 여기서 착용할 수 있어요' : ' · 비어 있으면 맨주먹으로 싸워요'}</small></div>
     <div class="slots">${Array.from({ length: MAX_EQUIP }, (_, i) => slot(eq[i])).join('')}</div>
     <div class="bl-label">가진 무기 <small>도감에서 조각으로 전투 레벨을 올려요 (최대 ${MAX_ARM_LV})</small></div>
@@ -85,6 +97,12 @@ $('bLobby').onclick = e => {
   const sb = e.target.closest('[data-stage]');
   if (sb) { proSel = +sb.dataset.stage; SFX.tick(); return renderBattle(); }
   if (e.target.closest('[data-gp-buy],[data-gp-toggle]')) return;
+  const mb = e.target.closest('[data-meta]');
+  if (mb) {
+    const miss = equipMeta(mb.dataset.meta);
+    SFX.tick(); if (miss > 0) toast(`없는 무기 ${miss}개는 빼고 장착했어요`);
+    return renderBattle();
+  }
   const un = e.target.closest('[data-un]'), eb = e.target.closest('[data-eq]');
   const eq = equipped();
   if (un) state.equip = eq.filter(x => x !== un.dataset.un);

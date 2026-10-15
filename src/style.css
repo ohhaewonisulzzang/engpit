@@ -737,3 +737,15 @@ main{margin-bottom:var(--navh)}
   .mt-arms{grid-template-columns:1fr}
   .mt-btns .btn{flex:1 1 40%;justify-content:center}
 }
+
+/* 전투 로비: 메타 고르기 */
+.bmetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.bmeta{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface);border:2px solid transparent;border-radius:14px;padding:10px 12px}
+.bmeta:hover{background:var(--surface2)}
+.bmeta.on{border-color:var(--coin)}
+.bmeta b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:52px}
+.bmeta span{display:flex;gap:4px}
+.bmeta img{width:40px;height:40px;background:var(--bg2);border-radius:8px}
+.bmeta em{position:absolute;top:9px;right:10px;font-style:normal;font-size:11px;font-weight:800;color:#2b1d00;background:var(--coin);border-radius:5px;padding:2px 6px}
+.bmeta-empty{color:var(--muted);font-size:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0}
+@media (max-width:699px){.bmetas{grid-template-columns:repeat(2,1fr)}}
