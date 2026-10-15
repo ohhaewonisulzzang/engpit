@@ -1,4 +1,4 @@
-import { state, save, monthKey } from './state.js';
+import { state, save, monthKey, SLOT, SUPER } from './state.js';
 import { MAX_LEVEL, TEST_MODE } from './config.js';
 import { WEAPONS } from './three/weapons.js';
 import { armLevel, MAX_ARM_LV } from './battle/data.js';
@@ -50,10 +50,16 @@ export const TITLE = Object.fromEntries([...TITLES, ...SHOP_TITLES].map(t => [t.
 /* ---------- 프로랭킹 1등 칭호: 1위로 마친 해마다 「20XX년 프로랭킹 1등」 ----------
    글자색은 흐르는 그라데이션 (style.css의 .pro-t). 지옥 스킨의 마무리 모션 글자도 같은 색을 쓴다 */
 export const PRO_GRAD = ['#ffe27a', '#ffb020', '#ff5a1f', '#e8364f', '#ffb020', '#ffe27a'];
-// 프로랭킹을 1위로 마친 해 (오래된 해부터). 테스트 모드에서는 올해가 열려 있다
+// 1위를 안 해도 프로랭킹 1등 보상(올해 칭호 + 지옥 스킨)을 주는 계정: 슈퍼계정 전부와 아래 계정
+// (아이디는 바뀔 수 있어서 계정 id로 적는다)
+const PRO_GIFT = [
+  'd3c1f153-b938-48d1-8d96-8e644fcc1755', // youngjin
+];
+const proGifted = () => SUPER || PRO_GIFT.includes(SLOT?.replace(/^(u|super|ctl)_/, ''));
+// 프로랭킹을 1위로 마친 해 (오래된 해부터). 테스트 모드와 위의 계정은 올해가 열려 있다
 export function proYears() {
   const ys = (state.proChamp || []).map(m => m.slice(0, 4));
-  if (TEST_MODE) ys.push(monthKey().slice(0, 4));
+  if (TEST_MODE || proGifted()) ys.push(monthKey().slice(0, 4));
   return [...new Set(ys)].sort();
 }
 const proTitle = y => ({ id: 'pro_' + y, name: `${y}년 프로랭킹 1등`, desc: `${y}년에 프로랭킹을 한 달 1위로 마쳤어요`, pro: true });
