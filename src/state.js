@@ -1,12 +1,12 @@
 // 저장 데이터 (브라우저 localStorage)
-// 일반 계정으로 로그인하면 'engpit_save_u_<id>'에 저장하고 서버(cloud.js)와 맞춘다. 서버 것이 진짜이고 이건 기기에 둔 사본
-// 슈퍼계정·관리 계정으로 로그인하면 따로 저장해서, 같은 브라우저의 일반 진행 상황과 섞이지 않게 한다
+// 로그인하면 계정 저장 칸('engpit_save_u_<id>', 슈퍼계정 'super_<id>', 관리 계정 'ctl_<id>')에 저장하고 서버(cloud.js)와 맞춘다.
+// 서버 것이 진짜이고 이건 기기에 둔 사본
 // 로그인하지 않으면 'engpit_save_v1' (예전에는 로그인해도 이걸 써서 기기마다 진행이 따로 놀았음)
 export const SLOT_KEY = 'engpit_slot';
 const slot = (() => { try { return localStorage.getItem(SLOT_KEY); } catch (e) { return null; } })();
 export const SLOT = slot; // 'u_<id>' | 'super_<id>' | 'ctl_<id>' | null
 export const SUPER = !!slot?.startsWith('super_');
-export const CLOUD = !!slot?.startsWith('u_');
+export const CLOUD = !!slot; // 로그인한 계정은 전부 서버 저장 (일반·슈퍼·관리 계정)
 export const GUEST_KEY = 'engpit_save_v1';
 export const SAVE_KEY = slot ? 'engpit_save_' + slot : GUEST_KEY;
 export const DEFAULT = () => ({
@@ -29,10 +29,13 @@ export const DEFAULT = () => ({
   cloudRev: 0, cloudDirty: false, // 일반 계정: 마지막으로 서버와 맞춘 저장 번호, 그 뒤에 바뀐 게 있는지 (cloud.js)
 });
 const load = k => { try { const s = JSON.parse(localStorage.getItem(k)); if (s && typeof s.coins === 'number') return s; } catch (e) {} return null; };
-// 이 브라우저에서 계정으로 처음 로그인: 예전 저장을 가져와 둔다. 서버에 그 계정 저장이 없을 때만 올라가고 (cloud.js)
-// 서버에 이미 있으면 서버 것으로 바뀐다
-export const FROM_GUEST = CLOUD && !load(SAVE_KEY) && !!load(GUEST_KEY);
-export const state = Object.assign(DEFAULT(), load(SAVE_KEY) || (FROM_GUEST && { ...load(GUEST_KEY), cloudRev: 0, cloudDirty: true }) || {});
+const cache = load(SAVE_KEY);
+// 이 브라우저에서 일반 계정으로 처음 로그인: 로그인 안 한 저장(업데이트 전에는 로그인해도 이걸 씀)을 가져와 둔다
+export const FROM_GUEST = !!slot?.startsWith('u_') && !cache && !!load(GUEST_KEY);
+// 서버와 한 번도 맞춘 적 없는 진행 (위의 예전 저장, 업데이트 전 이 기기에만 있던 슈퍼·관리 계정 저장):
+// 서버 것과 비교해서 진행이 많은 쪽이 남는다 (cloud.js의 migrateSave)
+export const LEGACY = CLOUD && (cache ? !cache.cloudRev : FROM_GUEST);
+export const state = Object.assign(DEFAULT(), cache || (FROM_GUEST && { ...load(GUEST_KEY), cloudRev: 0, cloudDirty: true }) || {});
 // 저장할 때마다 부를 함수 (관리 계정이 바뀐 상태를 서버에 바로 올릴 때 씀, control.js)
 const saveHooks = new Set();
 export const onSave = f => saveHooks.add(f);

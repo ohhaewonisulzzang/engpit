@@ -1,9 +1,9 @@
-import { state, CLOUD, FROM_GUEST, GUEST_KEY, SLOT_KEY, SAVE_KEY, onSave, writeLocal, replaceState, lockSave } from './state.js';
+import { state, CLOUD, FROM_GUEST, LEGACY, GUEST_KEY, SLOT_KEY, SAVE_KEY, onSave, writeLocal, replaceState, lockSave } from './state.js';
 import { session, loadSave, putSave, migrateSave, KICKED_KEY } from './ranking.js';
 
 /* =========================================================
    계정별 서버 저장 (서버 규칙은 supabase/cloud_save.sql)
-   - 일반 계정으로 로그인하면 서버의 저장이 진짜다. 게임을 시작할 때 서버 것을 받아 오고, 바뀔 때마다 올린다
+   - 로그인하면 (일반·슈퍼·관리 계정 모두) 서버의 저장이 진짜다. 게임을 시작할 때 서버 것을 받아 오고, 바뀔 때마다 올린다
    - 올릴 때 마지막으로 받은 저장 번호(rev)를 같이 보내서, 그 사이 다른 기기가 먼저 저장했으면 거절된다.
      그러면 이 기기의 옛 상태(다른 기기에서 쓴 코인이 안 줄어든 상태)는 버리고 서버 저장으로 다시 불러온다
    ========================================================= */
@@ -57,11 +57,11 @@ export async function cloudBoot() {
   }
 }
 async function first() {
-  // 업데이트 전부터 이 브라우저에 있던 진행: 서버 것보다 많으면 계정 저장이 되고, 아니면 서버 것을 받는다.
-  // 어느 쪽이든 지워서, 같은 옛 진행을 로그아웃 상태나 다른 계정으로 다시 쓰지 못하게 한다
-  if (FROM_GUEST) {
+  // 서버와 맞춘 적 없는 이 기기의 진행(업데이트 전 저장): 서버 것보다 많으면 계정 저장이 되고, 아니면 서버 것을 받는다.
+  // 로그인 안 한 저장에서 가져왔으면 지워서, 같은 옛 진행을 로그아웃 상태나 다른 계정으로 다시 쓰지 못하게 한다
+  if (LEGACY) {
     const res = await migrateSave(data());
-    try { localStorage.removeItem(GUEST_KEY); } catch (e) {}
+    if (FROM_GUEST) try { localStorage.removeItem(GUEST_KEY); } catch (e) {}
     if (!res.ok) return replaceState(res.data, res.rev);
     state.cloudRev = res.rev; state.cloudDirty = false; writeLocal();
     return;
