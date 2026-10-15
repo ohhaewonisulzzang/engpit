@@ -1,21 +1,25 @@
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
-import { allWords } from '../words.js';
+import { WORDS, TIERS, TIER_COINS, curTier } from '../words.js';
 import { SFX } from '../sound.js';
-import { pull, startPull, closeResult } from '../gacha.js';
+import { pull, multi, startPull, closeResult, skipPull, closeMulti } from '../gacha.js';
 import { currentTab, gainCoin, speak, esc } from './common.js';
 import { closeModal } from './dex.js';
+import { quizSound } from '../shop.js';
 
 /* =========================================================
-   단어 테스트: 뜻을 보고 영어 단어를 직접 쓴다 (맞히면 +1 코인)
+   단어 테스트: 뜻을 보고 영어 단어를 직접 쓴다 (맞히면 코인, 어려운 단계일수록 많이)
+   - 뽑기 기계 레벨의 단계 단어가 주로 나오고, REVIEW 확률로 아래 단계 단어가 복습으로 섞인다
    ========================================================= */
 export let curQ = null, streak = 0;
 let recent = [];
 const BONUS_EVERY = 5; // 연속 정답 보너스 간격
 const best = () => state.bestStreak || 0;
+const REVIEW = .25;
 
 export function nextQuestion() {
-  const words = allWords();
+  const t = curTier(), review = t > 0 && Math.random() < REVIEW;
+  const words = WORDS.filter(w => review ? w.tier < t : w.tier === t);
   let pool = words.filter(w => !recent.includes(w.en));
   if (!pool.length) pool = words;
   // 틀렸던 단어가 더 자주 나오게
@@ -26,6 +30,8 @@ export function nextQuestion() {
   curQ = { w, done: false, hints: new Set(), maxHints: Math.max(1, Math.floor(len / 2)) };
 
   $('qCat').textContent = w.cat;
+  const c = TIER_COINS[w.tier];
+  $('testNote').innerHTML = `지금은 <b>${TIERS[t]}</b> 단계 단어가 나와요 (뽑기 기계를 업그레이드하면 더 어려워져요). ${TIERS[w.tier]} 단어는 맞히면 코인 <i class="ci"></i> ${c}개, 5문제 연속으로 맞히면 보너스 1개를 더 받아요.`;
   $('qWord').textContent = w.ko;
   $('tiles').style.setProperty('--n', len);
   $('tiles').className = 'tiles';
@@ -84,17 +90,17 @@ function finish(ok, skipped = false) {
     streak++; state.correct++;
     if (streak > best()) state.bestStreak = streak;
     if (state.missed[q.w.en]) { state.missed[q.w.en]--; if (!state.missed[q.w.en]) delete state.missed[q.w.en]; }
-    gainCoin($('tiles'));
+    gainCoin($('tiles'), TIER_COINS[q.w.tier], true); quizSound(true); // 정답 소리는 상점에서 고른 것
     const bonus = streak % BONUS_EVERY === 0;
     if (bonus) setTimeout(() => gainCoin($('streak')), 350);
-    fb.innerHTML = bonus ? `${streak}연속 정답! 보너스 코인까지 +2` : streak >= 2 ? `정답! ${streak}연속` : '정답!';
+    fb.innerHTML = bonus ? `${streak}연속 정답! 보너스 코인까지 +${TIER_COINS[q.w.tier] + 1}` : streak >= 2 ? `정답! ${streak}연속` : '정답!';
     fb.className = 'feedback ok' + (bonus ? ' bonus' : '');
     tiles.classList.add('win');
     setTimeout(() => { if (curQ === q) nextQuestion(); }, bonus ? 1800 : 1200);
   } else {
     streak = 0; state.wrong++;
     state.missed[q.w.en] = (state.missed[q.w.en] || 0) + 1;
-    SFX.wrong(); tiles.classList.add('shake');
+    quizSound(false); tiles.classList.add('shake');
     fb.innerHTML = `${skipped ? '정답은' : '아쉬워요. 정답은'} <b>${esc(q.w.en)}</b>`;
     fb.className = 'feedback no';
     setTimeout(() => { if (curQ === q) nextQuestion(); }, 2400);
@@ -115,7 +121,7 @@ $('best').textContent = best();
 addEventListener('keydown', e => {
   if (currentTab === 'test' && e.key === 'Enter' && curQ?.done) { e.preventDefault(); nextQuestion(); return; }
   if (e.target.tagName === 'INPUT') return;
-  if (currentTab === 'gacha' && e.code === 'Space') { e.preventDefault(); if (pull?.phase === 'show') closeResult(false); else startPull(); }
+  if (currentTab === 'gacha' && e.code === 'Space') { e.preventDefault(); if (multi) closeMulti(false); else if (pull?.phase === 'show') closeResult(false); else if (pull) skipPull(); else startPull(); }
   if (currentTab === 'gacha' && e.key === 'Enter' && pull?.phase === 'show') closeResult(false);
   if (currentTab === 'study') { if (e.key === 'ArrowRight') $('fcNext').click(); if (e.key === 'ArrowLeft') $('fcPrev').click(); }
   if (e.key === 'Escape') closeModal();

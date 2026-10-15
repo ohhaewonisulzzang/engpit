@@ -6,12 +6,13 @@ import { WEAPONS } from '../three/weapons.js';
 import { thumb } from './dex.js';
 import { toast } from './common.js';
 import { galaxyHTML, bindGalaxy } from './galaxy.js';
-import { beginRun, submitWave, session, rankReady } from '../ranking.js';
+import { beginRun, submitWave, submitPro, session, rankReady } from '../ranking.js';
 import { G, hooks, startRun, choosePerk, setPaused, quitRun, clearRun } from '../battle/game.js';
-import { ARMS, KIND_NAME, MAX_EQUIP, PERKS, WAVE_LEN, MAX_ARM_LV, armLevel, lvMult, galaxyOn } from '../battle/data.js';
+import { ARMS, KIND_NAME, MAX_EQUIP, PERKS, WAVE_LEN, MAX_ARM_LV, armLevel, lvMult, galaxyOn, PRO_STAGES, PRO_GOAL, proOpen, proCost } from '../battle/data.js';
 
 /* =========================================================
    전투 화면: 무기 장착(로비), HUD, 웨이브 효과 고르기, 결과
+   - 하드 모드: 로비 아래에서 단계를 고르고 조각을 내고 출격. 기록은 프로랭킹으로
    ========================================================= */
 const show = (id, on) => $(id).classList.toggle('show', on);
 const byId = id => WEAPONS.find(w => w.id === id);
@@ -23,7 +24,26 @@ export function equipped() {
   state.equip = state.equip.filter(id => state.inv[id]).slice(0, MAX_EQUIP);
   return state.equip;
 }
-const power = id => Math.round(ARMS[id].dmg * lvMult(armLevel(state.inv[id])));
+const power = id => Math.round(ARMS[id].dmg * lvMult(armLevel(id)));
+// 하드 모드에서 고른 단계 (열린 가장 높은 단계가 기본)
+let proSel = null;
+const selStage = () => { if (proSel == null || !proOpen(proSel)) proSel = Math.min(state.proClear || 0, PRO_STAGES.length - 1); return proSel; };
+function hardHTML() {
+  const sel = selStage(), cost = proCost(sel), pb = state.proBest;
+  const stage = (st, i) => {
+    const open = proOpen(i), clear = i < (state.proClear || 0);
+    return `<button class="stage${i === sel ? ' on' : ''}${clear ? ' clear' : ''}" data-stage="${i}" ${open ? '' : 'disabled'}>
+      <b>${st.name}</b><small>${open ? `웨이브 ${st.start}부터` : '앞 단계를 깨면 열려요'}</small><small><i class="si"></i>${st.cost}</small></button>`;
+  };
+  return `<div class="hard">
+    <div class="hard-head"><div><b>하드 모드</b>
+      <p>조각을 내고 들어가는 극악 난이도예요. 높은 웨이브에서 시작하고 적이 훨씬 세며, 조각이 떨어지지 않아요. 웨이브 ${PRO_GOAL}개를 클리어하면 다음 단계가 열려요. 기록은 <b>프로랭킹</b>에 올라가요.</p></div>
+      <div class="hard-best"><b>${pb ? pb.wave : 0}</b>하드 최고 웨이브</div></div>
+    <div class="stages">${PRO_STAGES.map(stage).join('')}</div>
+    <div class="hard-go"><span>가진 조각 <i class="si"></i>${state.shards}</span>
+      <button class="btn hell" id="bHard" ${state.shards >= cost ? '' : 'disabled'}>${PRO_STAGES[sel].name} 출격 · 조각 ${PRO_STAGES[sel].cost}${cost ? '' : ' (무료)'}</button></div>
+  </div>`;
+}
 
 /* ---------- 로비 ---------- */
 export function renderBattle() {
@@ -35,7 +55,7 @@ export function renderBattle() {
     const w = byId(id);
     // 장착 칸: 무기 정보 + 갤럭시 파워 착용/해금
     return `<div class="slot" style="--rc:${RAR[w.r].color}"><div class="slot-main"><img src="${thumb(w, true)}" alt="">
-      <div><b>${w.name}</b><small>전투 Lv.${armLevel(state.inv[id])} · ${KIND_NAME[ARMS[id].kind]} · 공격력 ${power(id)}</small></div>
+      <div><b>${w.name}</b><small>전투 Lv.${armLevel(id)} · ${KIND_NAME[ARMS[id].kind]} · 공격력 ${power(id)}</small></div>
       <button class="out" data-un="${id}" aria-label="${w.name} 빼기">빼기</button></div>${galaxyHTML(w, true)}</div>`;
   };
   const card = w => {
@@ -43,7 +63,7 @@ export function renderBattle() {
     return `<button class="acard${on ? ' on' : ''}" style="--rc:${r.color}" data-eq="${w.id}">
       ${on ? '<em>장착 중</em>' : ''}<img src="${thumb(w, true)}" alt="">
       <span class="rl${w.r === 'ultra' ? ' ultra-c' : ''}"><i class="cap-ic"></i>${r.name}</span>
-      <b>${w.name}</b><small>Lv.${armLevel(state.inv[w.id])} · ${KIND_NAME[ARMS[w.id].kind]}${galaxyOn(w.id) ? ' · ✦' : ''}</small></button>`;
+      <b>${w.name}</b><small>Lv.${armLevel(w.id)} · ${KIND_NAME[ARMS[w.id].kind]}${galaxyOn(w.id) ? ' · ✦' : ''}</small></button>`;
   };
   $('bLobby').innerHTML = `<div class="bl-box">
     <div class="bl-head">
@@ -52,14 +72,18 @@ export function renderBattle() {
     </div>
     <div class="bl-label">장착한 무기 <small>${eq.length}/${MAX_EQUIP}${eq.length ? ' · 갤럭시 파워도 여기서 착용할 수 있어요' : ' · 비어 있으면 맨주먹으로 싸워요'}</small></div>
     <div class="slots">${Array.from({ length: MAX_EQUIP }, (_, i) => slot(eq[i])).join('')}</div>
-    <div class="bl-label">가진 무기 <small>같은 무기를 많이 가질수록 전투 레벨이 올라요 (최대 ${MAX_ARM_LV})</small></div>
+    <div class="bl-label">가진 무기 <small>도감에서 조각으로 전투 레벨을 올려요 (최대 ${MAX_ARM_LV})</small></div>
     <div class="armgrid">${owned.length ? owned.map(card).join('') : '<p class="bl-empty">아직 무기가 없어요. 뽑기에서 무기를 뽑아 오세요.</p>'}</div>
+    ${hardHTML()}
     <div class="bl-go"><span>이동: WASD·방향키 또는 화면을 누르고 끌기 · 일시정지: Esc</span><button class="btn primary" id="bStart">출격하기</button></div>
   </div>`;
 }
 bindGalaxy($('bLobby'), renderBattle);
 $('bLobby').onclick = e => {
   if (e.target.closest('#bStart')) return go();
+  if (e.target.closest('#bHard')) return go(selStage());
+  const sb = e.target.closest('[data-stage]');
+  if (sb) { proSel = +sb.dataset.stage; SFX.tick(); return renderBattle(); }
   if (e.target.closest('[data-gp-buy],[data-gp-toggle]')) return;
   const un = e.target.closest('[data-un]'), eb = e.target.closest('[data-eq]');
   const eq = equipped();
@@ -72,10 +96,17 @@ $('bLobby').onclick = e => {
   } else return;
   save(); SFX.tick(); renderBattle();
 };
-function go() {
-  clearRun(); startRun(equipped());
+// pro: 하드 모드 단계 번호 (없으면 일반 전투). 하드 모드는 출격할 때마다 조각을 낸다
+function go(pro = null) {
+  if (pro != null) {
+    const cost = proCost(pro);
+    if (!proOpen(pro) || state.shards < cost) { SFX.wrong(); toast('조각이 모자라요'); return; }
+    state.shards -= cost; save();
+  }
+  clearRun(); startRun(equipped(), pro);
   beginRun(); // 랭킹용 판 번호 받기 (로그인했을 때만)
   ['bLobby', 'bEnd', 'bPerk', 'bPause'].forEach(id => show(id, false));
+  $('bShards').parentElement.hidden = pro != null; // 하드 모드는 조각이 안 나온다
   $('bhud').hidden = false; SFX.pop();
 }
 
@@ -84,7 +115,7 @@ hooks.hud = g => {
   const p = g.p;
   $('bHp').style.width = Math.max(0, p.hp / p.maxHp * 100) + '%';
   $('bHpT').textContent = `${Math.ceil(p.hp)} / ${p.maxHp}`;
-  $('bWave').textContent = `웨이브 ${g.wave}`;
+  $('bWave').textContent = g.pro == null ? `웨이브 ${g.wave}` : `${PRO_STAGES[g.pro].name} · 웨이브 ${g.wave}`;
   $('bTime').textContent = { fight: `보스까지 ${Math.ceil(WAVE_LEN - g.waveT)}초`, boss: '보스를 쓰러뜨리세요!', clear: '클리어!' }[g.phase] || '';
   $('bShards').textContent = g.shards; $('bKills').textContent = g.kills;
   const b = g.boss; $('bBoss').hidden = !b;
@@ -114,7 +145,7 @@ hooks.pause = on => {
       <p>웨이브 ${G.wave} · 처치 ${G.kills} · 조각 ${G.shards}</p>
       ${got.length ? `<div class="owned-perks">${got.map(k => `<span><i>${k.ic}</i>${k.name} ${G.perks[k.id]}</span>`).join('')}</div>` : ''}
       <div class="fg-btns center"><button class="btn" id="bQuit">그만하기</button><button class="btn primary" id="bResume">계속하기</button></div>
-      <p class="small">그만둬도 지금까지 모은 조각은 그대로 받아요.</p></div>`;
+      <p class="small">${G.pro == null ? '그만둬도 지금까지 모은 조각은 그대로 받아요.' : '그만둬도 지금까지의 기록은 프로랭킹에 올라가요. 입장 조각은 돌려받지 못해요.'}</p></div>`;
     $('bResume').onclick = () => setPaused(false);
     $('bQuit').onclick = () => { show('bPause', false); quitRun(); };
   }
@@ -124,20 +155,22 @@ $('bPauseBtn').onclick = () => setPaused(true);
 
 hooks.end = s => {
   $('bhud').hidden = true; $('bBanner').className = 'bbanner'; show('bPerk', false); show('bPause', false);
-  $('bEnd').innerHTML = `<div class="bp-box"><h2>${s.gaveUp ? '전투 종료' : '쓰러졌어요'}</h2>${s.rec ? '<div class="rec">최고 기록!</div>' : ''}
-    <div class="end-stats"><div><b>${s.wave}</b>웨이브</div><div><b>${s.kills}</b>처치</div><div><b>${fmt(s.time)}</b>버틴 시간</div><div><b><i class="si"></i>${s.shards}</b>얻은 조각</div></div>
-    <p>조각은 도감 탭에서 행운과 뽑기 기계 업그레이드에 쓸 수 있어요.</p>
-    <p class="rk-sent" id="bRank">${rankReady() ? (session ? '랭킹에 기록을 올리는 중…' : '로그인하면 이 기록이 이번 달 랭킹에 올라가요 (랭킹 탭)') : ''}</p>
-    <div class="fg-btns center"><button class="btn" id="bToLobby">무기 바꾸기</button><button class="btn primary" id="bRetry">다시 도전</button></div></div>`;
+  const pro = s.pro != null, st = PRO_STAGES[s.pro], board = pro ? '프로랭킹' : '랭킹';
+  const cost = pro ? proCost(s.pro) : 0, retry = pro ? `다시 도전 · 조각 ${st.cost}${cost ? '' : ' (무료)'}` : '다시 도전';
+  $('bEnd').innerHTML = `<div class="bp-box"><h2>${pro ? `${st.name} · ` : ''}${s.gaveUp ? '전투 종료' : '쓰러졌어요'}</h2>${s.cleared ? `<div class="rec">${st.name} 클리어!</div>` : ''}${s.rec ? '<div class="rec">최고 기록!</div>' : ''}
+    <div class="end-stats"><div><b>${s.wave}</b>웨이브</div><div><b>${s.kills}</b>처치</div><div><b>${fmt(s.time)}</b>버틴 시간</div>${pro ? '' : `<div><b><i class="si"></i>${s.shards}</b>얻은 조각</div>`}</div>
+    <p>${pro ? `웨이브 ${st.start + PRO_GOAL - 1}까지 클리어하면 다음 단계가 열려요.` : '조각은 도감 탭에서 행운과 뽑기 기계 업그레이드에 쓸 수 있어요.'}</p>
+    <p class="rk-sent" id="bRank">${rankReady() ? (session ? `${board}에 기록을 올리는 중…` : `로그인하면 이 기록이 이번 달 ${board}에 올라가요 (랭킹 탭)`) : ''}</p>
+    <div class="fg-btns center"><button class="btn" id="bToLobby">무기 바꾸기</button><button class="btn ${pro ? 'hell' : 'primary'}" id="bRetry" ${state.shards >= cost ? '' : 'disabled'}>${retry}</button></div></div>`;
   show('bEnd', true);
-  // 이번 판 결과를 월간 랭킹에 올림 (서버가 이번 달 최고 기록보다 좋을 때만 바꿈)
-  if (session && rankReady()) submitWave(s.wave, s.kills)
+  // 이번 판 결과를 월간 랭킹(하드 모드는 프로랭킹)에 올림 (서버가 이번 달 최고 기록보다 좋을 때만 바꿈)
+  if (session && rankReady()) (pro ? submitPro(s.pro, s.wave, s.kills) : submitWave(s.wave, s.kills))
     .then(r => { if ($('bRank')) $('bRank').textContent = {
-      ok: '랭킹에 기록했어요. 랭킹 탭에서 순위를 확인해 보세요!', test: '테스트 모드에서는 랭킹에 올리지 않아요',
+      ok: `${board}에 기록했어요. 랭킹 탭에서 순위를 확인해 보세요!`, test: `테스트 모드에서는 ${board}에 올리지 않아요`,
       hidden: '이 계정은 랭킹에 올라가지 않아요', norun: '판을 시작할 때 랭킹 서버에 연결되지 않아 이번 판은 기록되지 않았어요', off: '',
     }[r]; })
-    .catch(() => { if ($('bRank')) $('bRank').textContent = '랭킹에 올리지 못했어요 (인터넷 연결이나 기록을 확인할 수 없었어요)'; });
-  $('bRetry').onclick = go;
+    .catch(() => { if ($('bRank')) $('bRank').textContent = `${board}에 올리지 못했어요 (인터넷 연결이나 기록을 확인할 수 없었어요)`; });
+  $('bRetry').onclick = () => go(s.pro);
   $('bToLobby').onclick = () => { show('bEnd', false); clearRun(); renderBattle(); show('bLobby', true); };
 };
 

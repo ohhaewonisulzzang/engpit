@@ -41,17 +41,20 @@ export const EXCLUSIVE_CHANCE = .4;
 
 // 분해와 행운: 남는 희귀/초희귀를 분해하거나 전투에서 적을 잡으면 조각이 나오고, 조각으로 행운을 올리면
 // 높은 등급 확률이 조금씩 오른다 (오른 만큼 희귀 확률이 줄어듦)
-export const SHARD_VALUE = { rare: 1, super: 2 };           // 1개 분해할 때 나오는 조각
+// 예전 저장 데이터에서 겹친 무기를 조각으로 바꿔 줄 때 1개당 조각 (main.js의 옮기기)
+export const SHARD_VALUE = { rare: 1, super: 2, hero: 8, legend: 20, ultra: 50 };
+// 가진 무기는 다시 안 나온다. 뽑힌 등급의 무기를 다 모았으면 무기 대신 코인(COIN_CHANCE 확률로 3~4개) 또는 조각
+export const PRIZE_SHARDS = { rare: 10, super: 20, hero: 50, legend: 120, ultra: 300 };
+export const PRIZE_COINS = () => 3 + Math.floor(Math.random() * 2);
+export const COIN_CHANCE = .1;
+
+// 천장: 이 횟수 안에 그 등급 이상이 한 번도 안 나오면 이번 뽑기에서 확정으로 나온다
+export const PITY = { legend: 30, ultra: 80 };
+// 조각 교환소: 조각으로 그 등급 무기 하나를 확정으로 얻는다 (안 가진 무기 먼저)
+export const SHOP = { hero: 40, legend: 120, ultra: 400 };
 export const LUCK_MAX = 10;
 export const LUCK_BOOST = { ultra: .08, legend: .06, hero: .05, super: .03 }; // 행운 1단계당 배율
 export const luckCost = luck => 4 + luck * 3;                 // 다음 행운 단계 가격
-
-// 천장: 이 횟수째 뽑기까지 그 등급 이상이 한 번도 안 나오면 그 뽑기는 확정 (울트라가 레전더리보다 먼저)
-export const PITY = { legend: 50, ultra: 150 };
-// 한 번에 뽑기 횟수 (코인도 그만큼)
-export const MULTI = [10, 100];
-// 조각 교환소: 조각을 내고 그 등급 무기 하나를 확정으로 받는다
-export const EXCHANGE = { hero: 50, legend: 140, ultra: 380 };
 
 export function oddsNow() {
   const base = lvl().odds, L = state.luck || 0, o = {};

@@ -1,17 +1,20 @@
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
-import { capColors } from '../market.js';
 import { tone, SFX } from '../sound.js';
 import { RAR } from '../config.js';
 import { WEAPONS } from '../three/weapons.js';
 import { sprite } from '../ui/dex.js';
-import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg, galaxyOn } from './data.js';
+import { curSkin, curTheme, paintHero } from '../shop.js';
+import { PRO_GRAD, proYears } from '../titles.js';
+import { FX, drawFx } from './fx.js'; // 이펙트 스프라이트 시트 (불러오면 미리 받아 둔다)
+import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg, galaxyOn, PRO_STAGES, PRO_GOAL, PRO_HP, PRO_DMG } from './data.js';
 
 /* =========================================================
    전투 (탕탕특공대식 핵앤슬래시)
    - 캐릭터는 이동만 하고, 장착한 무기가 알아서 공격한다
    - 웨이브마다 WAVE_LEN초를 버티면 보스가 나오고, 보스를 잡으면 효과를 하나 고른다
    - 적이 떨어뜨린 조각은 바로 내 조각에 더해진다 (행운·기계 업그레이드에 사용)
+   - 하드 모드(G.pro = 단계 번호): 높은 웨이브에서 시작하고 적이 더 세며, 조각이 떨어지지 않는다
    ========================================================= */
 export const hooks = { hud: null, perk: null, end: null, banner: null, pause: null };
 export let G = null;
@@ -48,9 +51,10 @@ const endJoy = e => { if (joy && joy.id === e.pointerId) joy = null; };
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
 
 /* ---------- 판 시작 / 끝 ---------- */
-export function startRun(ids) {
+export function startRun(ids, pro = null) {
+  const start = pro == null ? 1 : PRO_STAGES[pro].start;
   G = {
-    t: 0, wave: 1, waveT: 0, phase: 'fight', paused: false, clearT: 0,
+    pro, start, t: 0, wave: start, waveT: 0, phase: 'fight', paused: false, clearT: 0,
     p: { x: 0, y: 0, r: 14, hp: 120, maxHp: 120, face: 0, inv: 0, hurt: 0, walk: 0 },
     mods: { atk: 1, haste: 1, speed: 1, area: 1, proj: 0, crit: .05, armor: 0, regen: 0, magnet: 90, greed: 1 },
     perks: {}, enemies: [], shots: [], bullets: [], drops: [], parts: [], texts: [], fx: [], zones: [],
@@ -69,12 +73,12 @@ export function startRun(ids) {
   G.shieldT = 0; G.p.shield = 0;
   if (!W) fit();
   waveStart();
-  hooks.banner?.('웨이브 1', '#ffc83d');
+  hooks.banner?.(pro == null ? '웨이브 1' : `${PRO_STAGES[pro].name} · 웨이브 ${start}`, pro == null ? '#ffc83d' : '#ff5a1f');
 }
 function makeArm(id) {
   const w = WEAPONS.find(x => x.id === id);
   return {
-    id, w, d: ARMS[id], lv: w ? armLevel(state.inv[id]) : 1,
+    id, w, d: ARMS[id], lv: w ? armLevel(id) : 1,
     col: w ? RAR[w.r].color : '#f3efe6', img: w ? sprite(w) : null,
     cd: Math.random() * .4, ang: Math.random() * TAU, hits: new WeakMap(), gp: galaxyOn(id),
   };
@@ -101,17 +105,18 @@ function gameOver(gaveUp) {
   G.phase = 'over'; G.paused = false;
   const p = G.p;
   if (!gaveUp) { puff(p.x, p.y, '#ff6b6b', 60, 260); SFX.fanfare(0); }
-  const best = state.best || { wave: 0, kills: 0 };
+  // 일반 전투와 하드 모드는 최고 기록을 따로 적는다
+  const key = G.pro == null ? 'best' : 'proBest', best = state[key] || { wave: 0, kills: 0 };
   const rec = G.wave > best.wave || (G.wave === best.wave && G.kills > best.kills);
-  if (rec) state.best = { wave: G.wave, kills: G.kills };
+  if (rec) state[key] = { wave: G.wave, kills: G.kills };
   save();
-  const sum = { wave: G.wave, kills: G.kills, shards: G.shards, time: G.t, rec, gaveUp };
+  const sum = { wave: G.wave, kills: G.kills, shards: G.shards, time: G.t, rec, gaveUp, pro: G.pro, cleared: !!G.proCleared };
   setTimeout(() => hooks.end?.(sum), gaveUp ? 0 : 1300);
 }
 
 /* ---------- 웨이브 효과 ---------- */
 export function rollPerks() {
-  const pool = PERKS.filter(k => (G.perks[k.id] || 0) < k.max && !(k.id === 'heal' && G.p.hp >= G.p.maxHp));
+  const pool = PERKS.filter(k => (G.perks[k.id] || 0) < k.max && !(k.id === 'heal' && G.p.hp >= G.p.maxHp) && !(k.id === 'greed' && G.pro != null));
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   return pool.slice(0, 3);
 }
@@ -133,9 +138,10 @@ export function choosePerk(id) {
 }
 
 /* ---------- 적 ---------- */
+const proK = k => G.pro == null ? 1 : k; // 하드 모드에서만 곱하는 배율
 function spawnEnemy(type, x, y) {
-  const b = ENEMIES[type], hk = waveHp(G.wave);
-  const e = { ...b, type, look: type, x, y, hp: b.hp * hk, maxHp: b.hp * hk, dmg: b.dmg * waveDmg(G.wave), kx: 0, ky: 0, flash: 0, ph: Math.random() * TAU, shootT: rand(1, 2.5) };
+  const b = ENEMIES[type], hk = waveHp(G.wave) * proK(PRO_HP);
+  const e = { ...b, type, look: type, x, y, hp: b.hp * hk, maxHp: b.hp * hk, dmg: b.dmg * waveDmg(G.wave) * proK(PRO_DMG), kx: 0, ky: 0, flash: 0, ph: Math.random() * TAU, shootT: rand(1, 2.5) };
   G.enemies.push(e); return e;
 }
 const viewR = () => Math.hypot(W, H) / 2 / zoom;
@@ -155,7 +161,7 @@ function pickType() {
 function spawnBoss() {
   const b = bossFor(G.wave), a = Math.random() * TAU, d = viewR() * .8;
   const e = { ...b, type: 'boss', boss: true, x: G.p.x + Math.cos(a) * d, y: G.p.y + Math.sin(a) * d,
-    hp: b.hp, maxHp: b.hp, kx: 0, ky: 0, flash: 0, ph: 0, z: 0, patT: 2.5, pat: 0, act: null };
+    hp: b.hp * proK(PRO_HP), maxHp: b.hp * proK(PRO_HP), dmg: b.dmg * proK(PRO_DMG), kx: 0, ky: 0, flash: 0, ph: 0, z: 0, patT: 2.5, pat: 0, act: null };
   G.enemies.push(e); G.boss = e; G.phase = 'boss';
   hooks.banner?.(`보스 등장! ${b.name}`, b.col);
   SFX.charge(1.2); G.shake = .5;
@@ -211,7 +217,10 @@ function updateBoss(e, dt) {
       if (A.t > .9) e.act = null;
       break;
     case 'summon':
-      for (let i = 0, n = 4 + e.round * 2; i < n; i++) { const a = i / n * TAU; spawnEnemy(MINION[e.look], e.x + Math.cos(a) * 70, e.y + Math.sin(a) * 70); }
+      for (let i = 0, n = 4 + e.round * 2; i < n; i++) {
+        const a = i / n * TAU, x = e.x + Math.cos(a) * 70, y = e.y + Math.sin(a) * 70;
+        spawnEnemy(MINION[e.look], x, y); fxSprite('darkBolt', x, y + 10, 1.6, { rate: 1.6, ground: true });
+      }
       ring(e.x, e.y, 10, 90, e.col, .35); e.act = null;
       break;
     case 'slam': // 1초 경고 원 → 내려찍기
@@ -251,12 +260,14 @@ function strike(e, a, kx, ky) {
 function kill(e) {
   e.dead = true; G.kills++;
   puff(e.x, e.y, e.col, e.boss ? 80 : 10, e.boss ? 320 : 140);
+  const pro = G.pro != null; // 하드 모드는 조각이 안 떨어진다
   if (e.boss) {
-    const n = 10 + G.wave * 4;
+    const n = pro ? 0 : 10 + G.wave * 4;
     for (let i = 0; i < n; i++) drop(e.x, e.y, 'shard', 1, 260);
     drop(e.x, e.y, 'heart', 0, 120);
+    fxSprite('arcaneBurst', e.x, e.y, e.r / 30);
     G.boss = null; startClear();
-  } else if (Math.random() < e.drop) drop(e.x, e.y, 'shard', 1, 80);
+  } else if (!pro && Math.random() < e.drop) drop(e.x, e.y, 'shard', 1, 80);
   else if (Math.random() < .015) drop(e.x, e.y, 'heart', 0, 60);
 }
 function hitPlayer(v, src) {
@@ -273,15 +284,76 @@ function hitPlayer(v, src) {
 function explode(x, y, a) {
   const R = a.d.explode * modsFor(a).area;
   for (const e of G.enemies) if (!e.dead && Math.hypot(e.x - x, e.y - y) < R + e.r) strike(e, a, 0, 0);
-  ring(x, y, 10, R, '#ff8a3d', .3); puff(x, y, '#ffb020', 14, 160);
+  ring(x, y, 10, R, '#ff8a3d', .3); puff(x, y, '#ffb020', 14, 160); fxSprite('explosionPop', x, y, R / 20);
   tone(120, .15, 'sawtooth', .04, 0, 60);
 }
 function startClear() {
   G.phase = 'clear'; G.clearT = 0;
   for (const e of G.enemies) if (!e.dead) { e.dead = true; puff(e.x, e.y, e.col, 6, 100); }
   G.bullets.length = 0;
-  hooks.banner?.(`웨이브 ${G.wave} 클리어!`, '#4fd18b');
+  // 하드 모드: 시작 웨이브부터 PRO_GOAL개를 깨면 단계 클리어, 다음 단계가 열린다
+  const st = PRO_STAGES[G.pro];
+  if (st && !G.proCleared && G.wave - G.start + 1 >= PRO_GOAL) {
+    G.proCleared = true;
+    state.proClear = Math.max(state.proClear || 0, G.pro + 1);
+    hooks.banner?.(`${st.name} 클리어!${PRO_STAGES[G.pro + 1] ? ' 다음 단계가 열렸어요' : ''}`, '#ff5a1f');
+  } else hooks.banner?.(`웨이브 ${G.wave} 클리어!`, '#4fd18b');
+  // 지옥 스킨: 1등 한 해 숫자가 몸 주위를 돌다가 흡수되는 마무리 모션
+  const year = proYears().at(-1);
+  G.finale = curSkin().finale && year ? { t: 0, text: year, done: false } : null;
   SFX.fanfare(3); save();
+}
+
+/* ---------- 마무리 모션 (지옥 스킨) ----------
+   0 ~ FIN_SPIN초: 흰 숫자가 나타나며 칭호 그라데이션 색으로 바뀌고 캐릭터 주위를 원으로 천천히 돈다
+   FIN_SPIN ~ +FIN_ABS초: 점점 빨리 돌며 몸으로 빨려 들어가 사라지고, 흡수되는 순간 빛이 터진다 */
+const FIN_SPIN = 2, FIN_ABS = .8, FIN_R = 50;
+const FIN_SLOW = .35, FIN_BOOST = 1.6; // 도는 동안 초당 바퀴 수, 흡수하는 동안 더 도는 바퀴 수
+// 시간 t까지 돈 각도: 처음엔 일정하게 천천히, 흡수 구간에서는 u³으로 가속 (이어지는 순간 속도가 튀지 않음)
+const finAngle = t => {
+  const u = Math.max(0, t - FIN_SPIN) / FIN_ABS;
+  return TAU * (FIN_SLOW * t + FIN_BOOST * u * u * u);
+};
+const finaleBusy = () => G.finale && G.finale.t < FIN_SPIN + FIN_ABS;
+// 칭호 그라데이션(PRO_GRAD)에서 u(0~1, 반복) 위치의 색
+function gradAt(u) {
+  const n = PRO_GRAD.length - 1, x = (((u % 1) + 1) % 1) * n, i = Math.floor(x), f = x - i;
+  const hex = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+  const a = hex(PRO_GRAD[i]), b = hex(PRO_GRAD[i + 1]);
+  return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')})`;
+}
+function updateFinale(dt) {
+  const f = G.finale; if (!f) return;
+  f.t += dt;
+  if (!f.done && f.t >= FIN_SPIN + FIN_ABS) { // 흡수 완료
+    f.done = true;
+    const p = G.p;
+    ring(p.x, p.y, 4, 70, '#ffb020', .45); ring(p.x, p.y, 4, 46, '#ff5a1f', .3);
+    for (let i = 0; i < 26; i++) puff(p.x, p.y, gradAt(i / 26), 1, 260);
+    G.shake = Math.max(G.shake, .2); SFX.up(3);
+  }
+}
+function drawFinale() {
+  const f = G.finale; if (!f || f.t >= FIN_SPIN + FIN_ABS) return;
+  const p = G.p, chars = (f.text + ' ' + f.text + ' ').split(''); // 해를 두 번 써서 원을 채운다
+  const absorb = Math.max(0, f.t - FIN_SPIN) / FIN_ABS, ein = absorb * absorb; // 흡수 진행 (빨라지며 빨려 들어감)
+  const appear = Math.min(1, f.t / .18), gold = Math.min(1, f.t / .35); // 나타나기, 흰색 → 그라데이션
+  const R = FIN_R * (1 - ein) * (.6 + .4 * easeOut(appear)), spin = finAngle(f.t);
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  ctx.font = `700 ${Math.round(20 * (1 - ein * .7))}px Fredoka, Pretendard, sans-serif`;
+  chars.forEach((ch, i) => {
+    if (ch === ' ') return;
+    const a = spin + i / chars.length * TAU, x = p.x + Math.cos(a) * R, y = p.y - 4 + Math.sin(a) * R; // 찌그러지지 않은 원
+    const col = gradAt(i / chars.length + G.t * .6);
+    ctx.save(); ctx.translate(x, y); // 글자는 똑바로 세운 채 원을 따라 돈다
+    ctx.globalAlpha = appear * (1 - ein * .85);
+    ctx.shadowColor = col; ctx.shadowBlur = 12 * gold;
+    ctx.strokeStyle = 'rgba(40,8,4,.75)'; ctx.lineWidth = 3; ctx.strokeText(ch, 0, 0);
+    ctx.fillStyle = col; ctx.fillText(ch, 0, 0);
+    if (gold < 1) { ctx.globalAlpha *= 1 - gold; ctx.shadowBlur = 0; ctx.fillStyle = '#ffffff'; ctx.fillText(ch, 0, 0); }
+    ctx.restore();
+  });
+  ctx.restore();
 }
 
 /* ---------- 무기 ---------- */
@@ -361,7 +433,8 @@ function updateArm(a, dt) {
     a.cd = d.cd;
     for (let i = 0, n = d.count + m.proj; i < n && near.length; i++) {
       const e = near.splice(Math.floor(Math.random() * near.length), 1)[0], sr = d.splash * m.area;
-      G.fx.push({ type: 'bolt', x: e.x, y: e.y, t: 0, dur: .28, seed: Math.random() * 99, col: d.col });
+      if (d.strike) fxSprite(d.strike, e.x, e.y + e.r * .5, d.strike === 'lightning' ? 1.6 : .8, { rate: 2, ground: true });
+      else G.fx.push({ type: 'bolt', x: e.x, y: e.y, t: 0, dur: .28, seed: Math.random() * 99, col: d.col });
       for (const o of G.enemies) if (!o.dead && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < (sr + o.r) ** 2) strike(o, a, 0, 0);
       puff(e.x, e.y, '#cff4ff', 8, 140);
     }
@@ -423,6 +496,12 @@ function puff(x, y, col, n, sp) {
   }
 }
 const ring = (x, y, r0, r1, col, dur) => G.fx.push({ type: 'ring', x, y, r0, r1, col, t: 0, dur });
+// 이펙트 스프라이트 한 번 재생. rate: 재생 속도 배율, ground: (x, y)가 그림 아래쪽 끝 (번개처럼 땅에 내리꽂히는 것)
+function fxSprite(key, x, y, scale = 1, { rate = 1, ground = false } = {}) {
+  if (G.fx.length > 160) return;
+  const f = FX[key];
+  G.fx.push({ type: 'sprite', key, x, y: ground ? y - f.fh * scale / 2 : y, scale, rate, t: 0, dur: f.n / f.fps / rate });
+}
 function text(x, y, v, col, big) { if (G.texts.length < 70) G.texts.push({ x: x + rand(-8, 8), y, v, col, big, t: 0 }); }
 function drop(x, y, kind, v, sp) {
   const a = Math.random() * TAU, s = sp * (.3 + Math.random() * .7);
@@ -458,7 +537,9 @@ function update(dt) {
   if (G.phase === 'clear') {
     G.clearT += dt;
     G.drops.forEach(o => o.pull = true);
-    if (G.clearT > 2 && !G.drops.length || G.clearT > 4) { G.phase = 'perk'; hooks.perk?.(rollPerks()); }
+    updateFinale(dt);
+    if (finaleBusy()) {} // 마무리 모션이 끝난 뒤에 효과를 고른다
+    else if (G.clearT > 2 && !G.drops.length || G.clearT > 4) { G.phase = 'perk'; hooks.perk?.(rollPerks()); }
   }
 
   // 무기
@@ -490,7 +571,7 @@ function update(dt) {
         if (e.shootT <= 0 && d < 430) { e.shootT = rand(2, 3.2); fireBullet(e.x, e.y, Math.atan2(dy, dx), 220, e.dmg, '#c9f27a', true); }
       }
       if (e.bomb && d < e.r + p.r + 16) {
-        e.dead = true; ring(e.x, e.y, 10, 70, '#ff8a3d', .3); puff(e.x, e.y, '#ffb020', 20, 200);
+        e.dead = true; ring(e.x, e.y, 10, 70, '#ff8a3d', .3); puff(e.x, e.y, '#ffb020', 20, 200); fxSprite('explosionPop', e.x, e.y, 3.2);
         tone(100, .25, 'sawtooth', .07, 0, 40); G.shake = .3;
         if (d < 70) hitPlayer(e.dmg);
         continue;
@@ -532,7 +613,7 @@ function update(dt) {
     else { o.x += o.vx * dt; o.y += o.vy * dt; o.vx *= .9; o.vy *= .9; }
     if (d < p.r + 10) {
       o.got = true;
-      if (o.kind === 'heart') { p.hp = Math.min(p.maxHp, p.hp + 20); text(p.x, p.y - 26, '+20', '#4fd18b'); SFX.coin(); }
+      if (o.kind === 'heart') { p.hp = Math.min(p.maxHp, p.hp + 20); text(p.x, p.y - 26, '+20', '#4fd18b'); SFX.coin(); fxSprite('leafPoof', p.x, p.y - 4, 2); }
       else {
         G.shardAcc += o.v * m.greed; const n = Math.floor(G.shardAcc); G.shardAcc -= n;
         G.shards += n; state.shards += n;
@@ -556,14 +637,14 @@ function updateFx(dt) {
 /* ---------- 그리기 ---------- */
 const hash = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 function drawGround(cx, cy) {
-  const T = 80, hw = W / 2 / zoom, hh = H / 2 / zoom;
+  const th = curTheme(), T = 80, hw = W / 2 / zoom, hh = H / 2 / zoom;
   const x0 = Math.floor((cx - hw) / T) - 1, x1 = Math.ceil((cx + hw) / T), y0 = Math.floor((cy - hh) / T) - 1, y1 = Math.ceil((cy + hh) / T);
   for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) {
-    ctx.fillStyle = (i + j) & 1 ? '#0c3337' : '#0b2f33'; ctx.fillRect(i * T, j * T, T + .5, T + .5);
+    ctx.fillStyle = (i + j) & 1 ? th.a : th.b; ctx.fillRect(i * T, j * T, T + .5, T + .5);
     const h = hash(i, j), x = i * T + 10 + hash(j, i) * 60, y = j * T + 10 + h * 60;
-    if (h < .1) { ctx.fillStyle = '#134a50'; ctx.beginPath(); ctx.ellipse(x, y, 7, 4.5, 0, 0, TAU); ctx.fill(); }
-    else if (h < .2) { ctx.strokeStyle = '#1d6458'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x - 7, y - 8); ctx.moveTo(x, y); ctx.lineTo(x, y - 10); ctx.moveTo(x + 5, y); ctx.lineTo(x + 7, y - 8); ctx.stroke(); }
-    else if (h < .23) { ctx.fillStyle = '#ffc83d33'; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }
+    if (h < .1) { ctx.fillStyle = th.spot; ctx.beginPath(); ctx.ellipse(x, y, 7, 4.5, 0, 0, TAU); ctx.fill(); }
+    else if (h < .2) { ctx.strokeStyle = th.grass; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x - 7, y - 8); ctx.moveTo(x, y); ctx.lineTo(x, y - 10); ctx.moveTo(x + 5, y); ctx.lineTo(x + 7, y - 8); ctx.stroke(); }
+    else if (h < .23) { ctx.fillStyle = th.spark; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }
   }
 }
 function circle(x, y, r, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
@@ -663,14 +744,8 @@ function drawPlayer(p) {
   const bob = Math.abs(Math.sin(p.walk)) * 3;
   shadow(p.x, p.y + p.r * .9, p.r);
   if (p.inv > 0 && Math.floor(G.t * 20) % 2) return;
-  ctx.save(); ctx.translate(p.x, p.y - bob); ctx.rotate(-.42);
-  circle(0, 0, p.r, p.hurt > 0 ? '#ffb3b3' : '#f3efe6');
-  const hat = capColors(G.t); // 상점에서 고른 모자
-  ctx.fillStyle = hat.cap; ctx.beginPath(); ctx.arc(0, 0, p.r, Math.PI, 0); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = hat.band; ctx.fillRect(-p.r, -1, p.r * 2, 3);
-  ctx.rotate(.42);
-  const ox = Math.cos(p.face) * 4, oy = Math.sin(p.face) * 3;
-  circle(-4 + ox, 5 + oy, 2.2, '#14161c'); circle(4 + ox, 5 + oy, 2.2, '#14161c');
+  ctx.save(); ctx.translate(p.x, p.y - bob);
+  paintHero(ctx, p.r, curSkin(), { ox: Math.cos(p.face) * 4, oy: Math.sin(p.face) * 3, hurt: p.hurt > 0, t: G.t });
   ctx.restore();
   if (p.shield > 0) { ctx.strokeStyle = 'rgba(138,223,255,.8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y - bob, p.r + 6, 0, TAU); ctx.stroke(); }
 }
@@ -780,7 +855,9 @@ function draw() {
   const ents = [...G.enemies];
   ents.sort((a, b) => a.y - b.y);
   ents.forEach(drawEnemy);
+  for (const f of G.fx) if (f.type === 'sprite') drawFx(ctx, f.key, f.t * f.rate, f.x, f.y, f.scale);
   if (G.phase !== 'over') drawPlayer(p);
+  if (G.phase === 'clear') drawFinale();
   drawArms(); drawShots();
   for (const o of G.parts) { ctx.globalAlpha = Math.min(1, o.life / o.max * 1.5); circle(o.x, o.y, o.r, o.col); }
   ctx.globalAlpha = 1;

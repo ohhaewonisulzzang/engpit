@@ -1,4 +1,5 @@
 import { state } from '../state.js';
+import { FREE } from '../config.js';
 
 /* =========================================================
    전투 데이터: 무기 공격 방식, 적, 보스, 웨이브 효과
@@ -6,13 +7,24 @@ import { state } from '../state.js';
 export const MAX_EQUIP = 3;      // 전투에 들고 갈 수 있는 무기 수
 export const WAVE_LEN = 40;      // 웨이브마다 보스가 나오기까지 버티는 시간(초)
 
-// 같은 무기를 여러 개 가질수록 전투 레벨이 올라간다 (분해하면 내려감)
+// 전투 레벨 = 1 + 조각으로 올린 단계 (무기는 하나씩만 가진다)
 export const MAX_ARM_LV = 11;
-export const armLevel = n => Math.max(1, Math.min(n || 1, MAX_ARM_LV));
+export const armLevel = id => Math.min(1 + (state.inv[id] ? state.armUp?.[id] || 0 : 0), MAX_ARM_LV);
+// 조각으로 전투 레벨 1 올리기: 높은 등급일수록, 레벨이 높을수록 비싸다
+export const armUpCost = w => ({ rare: 2, super: 3, hero: 5, legend: 8, ultra: 12 }[w.r]) * armLevel(w.id);
+export function buyArmUp(w) {
+  if (!state.inv[w.id] || armLevel(w.id) >= MAX_ARM_LV) return false;
+  const cost = armUpCost(w);
+  if (state.shards < cost) return false;
+  state.shards -= cost;
+  state.armUp = { ...state.armUp, [w.id]: (state.armUp?.[w.id] || 0) + 1 };
+  return true;
+}
 export const lvMult = lv => 1 + .12 * (lv - 1);
 
 // kind: swing(앞쪽 휘두르기) | spin(360도 베기) | shot(던지기) | orbit(주위를 돎) | nova(사방으로 발사)
 //       thrust(일직선 찌르기) | bolt(주변 적에게 번개) | zone(블랙홀 장판)
+// strike: 번개를 그림 대신 이펙트 스프라이트로 (battle/fx.js의 FX 이름)
 // slow: 맞은 적이 잠깐 느려짐
 export const KIND_NAME = { swing: '휘두르기', spin: '회전 베기', shot: '던지기', orbit: '주위를 돎', nova: '사방 발사', thrust: '찌르기', bolt: '번개', zone: '블랙홀' };
 export const ARMS = {
@@ -35,7 +47,7 @@ export const ARMS = {
   kunai:       { kind: 'shot',  dmg: 11, cd: .6,  speed: 520, pierce: 0, count: 2, size: 38 },
   spear:       { kind: 'thrust', dmg: 26, cd: .85, reach: 160, width: 20 },
   chakram:     { kind: 'orbit', dmg: 20, count: 2, radius: 92, spin: 4.2, size: 56, slow: true },
-  thunder:     { kind: 'bolt',  dmg: 34, cd: 1.1, count: 3, range: 380, splash: 45 },
+  thunder:     { kind: 'bolt',  dmg: 34, cd: 1.1, count: 3, range: 380, splash: 45, strike: 'lightning' },
   frostbow:    { kind: 'shot',  dmg: 30, cd: .9,  speed: 620, pierce: 4, count: 3, arrow: true, slow: true, size: 10 },
   blackhole:   { kind: 'zone',  dmg: 20, cd: 3.2, radius: 115, life: 2.6 },
   // 추가 레전더리
@@ -60,7 +72,7 @@ export const ARMS = {
   nebulastaff:   { kind: 'zone',  dmg: 26, cd: 2.6, radius: 140, life: 3 },
   supernova:     { kind: 'nova',  dmg: 40, cd: 1.3, count: 12, speed: 560, size: 50 },
   abysstrident:  { kind: 'thrust', dmg: 60, cd: 1.0, reach: 230, width: 32 },
-  zeusspear:     { kind: 'bolt',  dmg: 48, cd: 1.0, count: 4, range: 460, splash: 60 },
+  zeusspear:     { kind: 'bolt',  dmg: 48, cd: 1.0, count: 4, range: 460, splash: 60, strike: 'lightningCartoon' },
   dragonfang:    { kind: 'spin',  dmg: 58, cd: 1.4, reach: 165, knock: 220 },
   angelwing:     { kind: 'orbit', dmg: 30, count: 5, radius: 115, spin: 4.4, size: 54 },
   demonaxe:      { kind: 'shot',  dmg: 50, cd: 1.2, speed: 400, pierce: 99, boomerang: true, spinning: true, size: 72 },
@@ -164,7 +176,7 @@ export const galaxyOn = id => GALAXY[id] && state.galaxy?.[id] && !state.gpOff?.
 export function galaxyState(w) {
   if (!GALAXY[w.id] || !state.inv[w.id]) return 'none';
   if (state.galaxy?.[w.id]) return state.gpOff?.[w.id] ? 'off' : 'on';
-  return armLevel(state.inv[w.id]) >= GALAXY_LV ? 'buy' : 'locked';
+  return armLevel(w.id) >= GALAXY_LV ? 'buy' : 'locked';
 }
 // 해금하면 바로 착용된다
 export function unlockGalaxy(w) {
@@ -208,6 +220,21 @@ export function bossFor(wave) {
 }
 export const waveHp = wave => 1 + .35 * (wave - 1);
 export const waveDmg = wave => 1 + .12 * (wave - 1);
+
+// 하드 모드(프로): 조각을 내고 들어가는 극악 난이도. 단계마다 높은 웨이브에서 시작하고 적이 더 세다
+// 시작 웨이브부터 PRO_GOAL개 웨이브를 클리어하면 그 단계 클리어 → 다음 단계가 열린다 (판은 쓰러질 때까지 계속)
+// 하드 모드에서는 조각이 떨어지지 않는다. 기록은 프로랭킹에 올라간다 (시작 웨이브는 supabase/pro_ranking.sql과 같아야 함)
+export const PRO_STAGES = [
+  { name: '하드 Ⅰ', start: 30,  cost: 40 },
+  { name: '하드 Ⅱ', start: 45,  cost: 70 },
+  { name: '하드 Ⅲ', start: 60,  cost: 110 },
+  { name: '하드 Ⅳ', start: 80,  cost: 160 },
+  { name: '하드 Ⅴ', start: 100, cost: 240 },
+];
+export const PRO_GOAL = 5;
+export const PRO_HP = 1.6, PRO_DMG = 1.4; // 웨이브 배율 위에 더 곱하는 적 체력·공격력 배율
+export const proOpen = i => FREE || i <= (state.proClear || 0);
+export const proCost = i => FREE ? 0 : PRO_STAGES[i].cost;
 
 // 웨이브를 버티면 셋 중 하나를 고르는 효과
 export const PERKS = [
