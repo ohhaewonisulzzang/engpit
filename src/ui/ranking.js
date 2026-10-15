@@ -1,6 +1,5 @@
 import { $ } from '../dom.js';
-import { state, save, monthKey, SUPER } from '../state.js';
-import { syncSlot } from '../cloud.js';
+import { state, save, monthKey, SUPER, SLOT_KEY } from '../state.js';
 import { TEST_MODE } from '../config.js';
 import { SFX } from '../sound.js';
 import { rankReady, session, onAuth, signUp, logIn, logOut, authError, ID_RULE, fetchTop, fetchMine, fetchChampMonths } from '../ranking.js';
@@ -21,6 +20,20 @@ function untilReset() {
 }
 const MEDAL = ['#ffc83d', '#c9d3dc', '#d08a4a'];
 const rec = r => `<span class="rk-sh">${r.wave}<small>웨이브</small></span><span class="rk-k">처치 ${r.kills.toLocaleString()}</span>`;
+
+/* ---------- 슈퍼계정·관리 계정 전용 저장 ----------
+   슈퍼계정으로 로그인하면 'engpit_save_super_<id>'에 따로 저장하고(무한 코인, 전부 해금),
+   관리 계정은 'engpit_save_ctl_<id>'에 따로 저장한다(대시보드에서 바꾼 값을 받음, control.js).
+   로그아웃하면 원래 저장으로 돌아간다. 바뀔 때는 새로고침해서 처음부터 다시 불러온다 */
+export function syncSlot() {
+  const want = session?.super ? 'super_' + session.uid : session?.ctl ? 'ctl_' + session.uid : null;
+  const have = (() => { try { return localStorage.getItem(SLOT_KEY); } catch (e) { return null; } })();
+  if (want === have) return false;
+  try { want ? localStorage.setItem(SLOT_KEY, want) : localStorage.removeItem(SLOT_KEY); } catch (e) { return false; }
+  location.reload();
+  return true;
+}
+syncSlot();
 
 /* ---------- 머리 위 계정 버튼 ---------- */
 function renderAcct() {
@@ -60,7 +73,7 @@ export function renderLogin() {
   const box = $('loginBox');
   if (session) {
     box.innerHTML = `<div class="auth-card">
-      <div class="auth-hello"><span class="auth-av">${esc(session.username[0].toUpperCase())}</span><div><b>${esc(session.username)}</b><small>${SUPER ? '슈퍼계정이에요. 코인이 무한이고 모든 무기·기계·갤럭시 파워가 열려 있어요.' : '로그인 중이에요. 진행 상황이 계정에 저장되고, 전투 기록이 이번 달 랭킹에 올라가요.'}</small></div></div>
+      <div class="auth-hello"><span class="auth-av">${esc(session.username[0].toUpperCase())}</span><div><b>${esc(session.username)}</b><small>${SUPER ? '슈퍼계정이에요. 코인이 무한이고 모든 무기·기계·갤럭시 파워가 열려 있어요.' : '로그인 중이에요. 전투 기록이 이번 달 랭킹에 올라가요.'}</small></div></div>
       <div class="auth-btns"><button class="btn primary" data-tab="rank">랭킹 보기</button><button class="btn" id="authOut">로그아웃</button></div></div>`;
     $('authOut').onclick = () => { logOut(); SFX.tick(); toast('로그아웃했어요'); };
     return;
@@ -68,7 +81,7 @@ export function renderLogin() {
   const up = mode === 'signup';
   box.innerHTML = `<form class="auth-card" id="authForm">
     <h2>${up ? '회원가입' : '로그인'}</h2>
-    <p class="auth-sub">${up ? '아이디와 비밀번호만 정하면 바로 가입돼요. 아이디가 랭킹에 이름으로 보여요.' : '로그인하면 진행 상황이 계정에 저장돼서 다른 기기에서도 이어서 할 수 있어요.'}</p>
+    <p class="auth-sub">${up ? '아이디와 비밀번호만 정하면 바로 가입돼요. 아이디가 랭킹에 이름으로 보여요.' : '로그인하면 전투 기록이 이번 달 랭킹에 올라가요.'}</p>
     <label>아이디<input id="authId" autocomplete="username" spellcheck="false" autocapitalize="off" maxlength="16" placeholder="영어·숫자·_ 3~16자"></label>
     <label>비밀번호<input id="authPw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" placeholder="6자 이상"></label>
     ${up ? '<label>비밀번호 확인<input id="authPw2" type="password" autocomplete="new-password"></label><small class="auth-warn">비밀번호를 잊으면 찾을 수 없으니 꼭 기억해 두세요.</small>' : ''}
@@ -88,7 +101,7 @@ export function renderLogin() {
     try {
       await (up ? signUp(id, pw) : logIn(id, pw));
       SFX.coin(); toast(up ? `가입 완료! 환영해요, ${esc(session.username)}님` : `${esc(session.username)}님, 반가워요`);
-      if (syncSlot()) return; // 계정 저장 칸으로 바꿔서 새로고침 (서버 저장을 불러옴)
+      if (syncSlot()) return; // 슈퍼계정이면 전용 저장으로 바꿔서 새로고침
       leaveLogin();
     } catch (ex) { err(authError(ex)); }
     finally { busyAuth = false; if ($('authGo')) $('authGo').disabled = false; }

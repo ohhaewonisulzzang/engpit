@@ -1,14 +1,28 @@
 // 저장 데이터 (브라우저 localStorage)
-// 로그인하면 계정 저장 칸('engpit_save_u_<id>', 슈퍼계정 'super_<id>', 관리 계정 'ctl_<id>')에 저장하고 서버(cloud.js)와 맞춘다.
-// 서버 것이 진짜이고 이건 기기에 둔 사본
-// 로그인하지 않으면 'engpit_save_v1' (예전에는 로그인해도 이걸 써서 기기마다 진행이 따로 놀았음)
+// 슈퍼계정·관리 계정으로 로그인하면 따로 저장해서, 같은 브라우저의 일반 진행 상황과 섞이지 않게 한다
 export const SLOT_KEY = 'engpit_slot';
+// 되돌리기 복구 (한 번만): 계정별 서버 저장을 쓰던 동안(2026-10-15, 되돌림) 일반 계정의 진행은 'engpit_save_u_<id>'에 있었고
+// 로그인 안 한 저장('engpit_save_v1')은 지워졌을 수 있다. 진행이 가장 많은 것을 'engpit_save_v1'로 되돌려 놓는다
+(() => {
+  try {
+    if (localStorage.getItem('engpit_unclouded')) return;
+    if (localStorage.getItem(SLOT_KEY)?.startsWith('u_')) localStorage.removeItem(SLOT_KEY);
+    const score = s => [Object.values(s.inv || {}).filter(n => n > 0).length, s.level || 1, Object.values(s.armUp || {}).reduce((a, b) => a + (+b || 0), 0), s.pulls || 0];
+    const more = (a, b) => { const x = score(a), y = score(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('engpit_save_u_'));
+    let best = null;
+    for (const k of ['engpit_save_v1', ...keys]) { // 진행이 같으면 나중에 쓴 계정 저장 쪽
+      const s = JSON.parse(localStorage.getItem(k));
+      if (s && typeof s.coins === 'number' && (!best || !more(best, s))) best = s;
+    }
+    if (best) { delete best.cloudRev; delete best.cloudDirty; localStorage.setItem('engpit_save_v1', JSON.stringify(best)); }
+    localStorage.setItem('engpit_unclouded', '1');
+  } catch (e) {}
+})();
 const slot = (() => { try { return localStorage.getItem(SLOT_KEY); } catch (e) { return null; } })();
-export const SLOT = slot; // 'u_<id>' | 'super_<id>' | 'ctl_<id>' | null
+export const SLOT = slot; // 'super_<id>' | 'ctl_<id>' | null
 export const SUPER = !!slot?.startsWith('super_');
-export const CLOUD = !!slot; // 로그인한 계정은 전부 서버 저장 (일반·슈퍼·관리 계정)
-export const GUEST_KEY = 'engpit_save_v1';
-export const SAVE_KEY = slot ? 'engpit_save_' + slot : GUEST_KEY;
+export const SAVE_KEY = slot ? 'engpit_save_' + slot : 'engpit_save_v1';
 export const DEFAULT = () => ({
   coins: 3, inv: {}, pulls: 0, correct: 0, wrong: 0, custom: [], missed: {},
   level: 1, // 뽑기 기계 레벨 (조각으로 업그레이드)
@@ -26,33 +40,18 @@ export const DEFAULT = () => ({
   shop: {},    // 상점에서 산 것 { 'skin:gold': true } (칭호는 titles에)
   skin: 'basic', theme: 'basic', sfx: 'basic', // 쓰는 중인 캐릭터 스킨·배경 테마·정답 효과음 (shop.js)
   ctlRev: 0,   // 관리 계정: 대시보드에서 바꾼 값을 몇 번째까지 적용했는지 (control.js)
-  cloudRev: 0, cloudDirty: false, // 일반 계정: 마지막으로 서버와 맞춘 저장 번호, 그 뒤에 바뀐 게 있는지 (cloud.js)
 });
-const load = k => { try { const s = JSON.parse(localStorage.getItem(k)); if (s && typeof s.coins === 'number') return s; } catch (e) {} return null; };
-const cache = load(SAVE_KEY);
-// 이 브라우저에서 일반 계정으로 처음 로그인: 로그인 안 한 저장(업데이트 전에는 로그인해도 이걸 씀)을 가져와 둔다
-export const FROM_GUEST = !!slot?.startsWith('u_') && !cache && !!load(GUEST_KEY);
-// 서버와 한 번도 맞춘 적 없는 진행 (위의 예전 저장, 업데이트 전 이 기기에만 있던 슈퍼·관리 계정 저장):
-// 서버 것과 비교해서 진행이 많은 쪽이 남는다 (cloud.js의 migrateSave)
-export const LEGACY = CLOUD && (cache ? !cache.cloudRev : FROM_GUEST);
-export const state = Object.assign(DEFAULT(), cache || (FROM_GUEST && { ...load(GUEST_KEY), cloudRev: 0, cloudDirty: true }) || {});
+export const state = (() => {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && typeof s.coins === 'number') return Object.assign(DEFAULT(), s);
+  } catch (e) {}
+  return DEFAULT();
+})();
 // 저장할 때마다 부를 함수 (관리 계정이 바뀐 상태를 서버에 바로 올릴 때 씀, control.js)
 const saveHooks = new Set();
 export const onSave = f => saveHooks.add(f);
-export const writeLocal = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} };
-let locked = false;
-export const lockSave = () => { locked = true; }; // 서버 저장으로 다시 불러오기 직전: 더는 안 씀
-export function save() {
-  if (locked) return;
-  if (CLOUD) state.cloudDirty = true;
-  writeLocal(); saveHooks.forEach(f => f());
-}
-// 서버에서 받은 저장으로 통째로 바꾼다 (화면이 뜨기 전에, 또는 바꾼 뒤 새로고침)
-export function replaceState(data, rev) {
-  for (const k of Object.keys(state)) delete state[k];
-  Object.assign(state, DEFAULT(), data, { cloudRev: rev, cloudDirty: false });
-  writeLocal();
-}
+export function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} saveHooks.forEach(f => f()); }
 
 // 랭킹 시즌: 한국 시간 기준 한 달 ("2026-10")
 export const monthKey = (d = new Date()) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 7);
