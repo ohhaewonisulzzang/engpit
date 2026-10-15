@@ -69,20 +69,49 @@ async function withProfile(s) {
   try { s.ctl = !!(await req('/rest/v1/rpc/ctl_sync', { method: 'POST', token: s.token, body: {} })).data; } catch (e) {}
   return s;
 }
+// 이 기기만 로그아웃 (scope를 안 붙이면 서버가 이 계정의 모든 기기를 로그아웃시킴)
 export function logOut() {
   const t = session?.token; setSession(null);
-  if (t) req('/auth/v1/logout', { method: 'POST', token: t }).catch(() => {});
+  if (t) req('/auth/v1/logout?scope=local', { method: 'POST', token: t }).catch(() => {});
 }
-// 토큰이 곧 만료되면 새로 받아 온다 (리프레시가 실패하면 로그아웃)
+// 다른 탭이 로그인·로그아웃하거나 토큰을 새로 받으면 이 탭도 같은 로그인 정보를 쓴다
+const stored = () => { try { return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch (e) { return null; } };
+addEventListener('storage', e => {
+  if (e.key !== AUTH_KEY) return;
+  const s = stored(), was = session;
+  session = s;
+  if (!s || !was || s.uid !== was.uid) listeners.forEach(f => f(s)); // 계정이 바뀌거나 로그아웃: 저장 칸을 바꾸도록 알림
+});
+
+/* 토큰이 곧 만료되면 새로 받아 온다
+   리프레시 토큰은 한 번 쓰면 바뀌고, 이미 쓴 토큰을 다시 쓰면 서버가 그 로그인을 통째로 끊는다.
+   예전에는 탭마다 처음 읽은 리프레시 토큰을 들고 있어서, 한 탭이 토큰을 새로 받은 뒤 다른 탭이 옛 토큰을 쓰면
+   로그아웃되면서 로그인 안 한 저장(빈 진행)으로 바뀌었다.
+   → 탭끼리 잠금(navigator.locks)을 걸고 한 번에 한 탭만 새로 받으며, 받기 전에 다른 탭이 이미 받아 둔 게 있으면 그걸 쓴다 */
+let refreshing = null, rejected = null; // rejected: 서버가 거절한 토큰 (다른 탭에 남아 있어도 다시 안 씀)
 async function token() {
   if (!session) return null;
   if (Date.now() < session.exp) return session.token;
-  try {
-    const { data } = await req('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh } });
-    setSession({ ...fromAuth(data, session.username), super: session.super, hideRank: session.hideRank, ctl: session.ctl });
-    return session.token;
-  } catch (e) { if (e.status === 400 || e.status === 401) setSession(null); return null; }
+  refreshing ||= (navigator.locks ? navigator.locks.request('engpit_auth', refresh) : refresh()).finally(() => { refreshing = null; });
+  return refreshing;
 }
+async function refresh() {
+  const s = stored();
+  if (!s || !session || s.uid !== session.uid) { session = s; listeners.forEach(f => f(s)); return null; }
+  if (Date.now() < s.exp && s.token !== rejected) { session = s; return s.token; } // 다른 탭이 이미 새로 받아 둠
+  try {
+    const { data } = await req('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: s.refresh } });
+    setSession({ ...fromAuth(data, s.username), super: s.super, hideRank: s.hideRank, ctl: s.ctl });
+    return session.token;
+  } catch (e) {
+    if (e.status === 400 || e.status === 401) {
+      try { localStorage.setItem(KICKED_KEY, '1'); } catch (x) {} // 다음 화면에서 로그인이 풀렸다고 알려 줌 (cloud.js)
+      setSession(null);
+    }
+    return null;
+  }
+}
+export const KICKED_KEY = 'engpit_kicked';
 
 // 판 시작: 서버에서 판 번호를 받아 둔다. 끝나면 이 번호로만 기록을 올릴 수 있고,
 // 서버는 판이 시작된 뒤 실제로 흐른 시간에 비해 웨이브·처치 수가 말이 되는지 확인한다 (supabase/secure_runs.sql)
@@ -113,9 +142,15 @@ export async function ctlSync(snapshot, rev) {
   catch (e) { return undefined; }
 }
 // 계정별 서버 저장 (supabase/cloud_save.sql). 로그인이 풀렸으면 'auth' 오류를 던진다
-async function rpc(name, body, opts) {
+async function rpc(name, body, opts, retry = true) {
   const t = await token(); if (!t) throw Object.assign(new Error('login required'), { code: session ? 'net' : 'auth' }); // 토큰을 못 받았는데 로그인이 남아 있으면 연결 문제
-  return (await req('/rest/v1/rpc/' + name, { method: 'POST', token: t, body, ...opts })).data;
+  try { return (await req('/rest/v1/rpc/' + name, { method: 'POST', token: t, body, ...opts })).data; }
+  catch (e) {
+    // 서버가 토큰을 안 받아 줌(만료·취소): 한 번 새로 받아서 다시 (그래도 안 되면 refresh가 로그아웃시킴)
+    if (e.status !== 401 || !retry || !session) throw e;
+    rejected = t; if (session.token === t) session = { ...session, exp: 0 };
+    return rpc(name, body, opts, false);
+  }
 }
 export const loadSave = () => rpc('load_save', {});                         // { rev, data } | null
 export const migrateSave = data => rpc('migrate_save', { p_data: data });   // { ok, rev, data? }

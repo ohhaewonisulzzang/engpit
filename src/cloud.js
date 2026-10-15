@@ -1,5 +1,5 @@
-import { state, CLOUD, FROM_GUEST, GUEST_KEY, SLOT_KEY, onSave, writeLocal, replaceState, lockSave } from './state.js';
-import { session, loadSave, putSave, migrateSave } from './ranking.js';
+import { state, CLOUD, FROM_GUEST, GUEST_KEY, SLOT_KEY, SAVE_KEY, onSave, writeLocal, replaceState, lockSave } from './state.js';
+import { session, loadSave, putSave, migrateSave, KICKED_KEY } from './ranking.js';
 
 /* =========================================================
    계정별 서버 저장 (서버 규칙은 supabase/cloud_save.sql)
@@ -29,12 +29,18 @@ function gate(msg, btn, onBtn) {
 }
 const ungate = () => document.getElementById('cloudGate')?.remove();
 
+// 로그인이 저절로 풀려서 로그인 안 한 화면으로 바뀌었으면 한 번 알려 준다 (진행이 사라진 게 아님)
+export function kickedNotice() {
+  let k = null; try { k = localStorage.getItem(KICKED_KEY); localStorage.removeItem(KICKED_KEY); } catch (e) {}
+  if (k && !session) gate('로그인이 풀려서 로그인하지 않은 화면으로 바뀌었어요.<br>진행 상황은 계정에 그대로 있으니, 다시 로그인하면 불러와요.', '확인', ungate);
+}
+
 const data = () => { const { cloudRev, cloudDirty, ...d } = state; return d; };
 
-// 다른 기기가 먼저 저장했음: 서버 저장으로 바꾸고 새로고침 (이 기기에서 그 뒤에 한 것은 버림)
+// 다른 기기(탭)가 먼저 저장했음: 서버 저장으로 바꾸고 새로고침 (이 기기에서 그 뒤에 한 것은 버림)
+const stale = () => gate('다른 기기나 다른 탭에서 이 계정으로 진행한 내용이 있어요.<br>서버에 저장된 진행 상황으로 다시 불러올게요.', '다시 불러오기', () => location.reload());
 function overwritten(res) {
-  replaceState(res.data, res.rev); lockSave();
-  gate('다른 기기에서 이 계정으로 진행한 내용이 있어요.<br>서버에 저장된 진행 상황으로 다시 불러올게요.', '다시 불러오기', () => location.reload());
+  replaceState(res.data, res.rev); lockSave(); stale();
 }
 
 /* ---------- 시작할 때: 서버 저장에 맞추기 ----------
@@ -85,6 +91,16 @@ if (CLOUD) {
   // 다른 창으로 가거나 닫을 때는 바로 올리고, 다시 돌아오면 다른 기기에서 저장했는지 확인
   addEventListener('pagehide', () => push(true));
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' ? push(true) : check());
+  // 화면을 켜 둔 채로 있어도 30초마다 다른 기기에서 저장했는지 확인
+  setInterval(() => { if (document.visibilityState === 'visible') check(); }, 30e3);
+  // 같은 브라우저의 다른 탭이 서버에 저장했으면 이 탭의 화면은 옛 상태: 바로 다시 불러온다
+  addEventListener('storage', e => {
+    if (e.key !== SAVE_KEY || halted || !e.newValue) return;
+    let rev = 0; try { rev = JSON.parse(e.newValue).cloudRev || 0; } catch (x) {}
+    if (rev > state.cloudRev) {
+      halted = true; lockSave(); stale();
+    }
+  });
 }
 async function push(keepalive) {
   if (halted || !state.cloudDirty) return;
