@@ -4,7 +4,6 @@ import { tone, SFX } from '../sound.js';
 import { RAR } from '../config.js';
 import { WEAPONS } from '../three/weapons.js';
 import { sprite } from '../ui/dex.js';
-import { curSkin, curTheme, paintHero } from '../shop.js';
 import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg, galaxyOn } from './data.js';
 
 /* =========================================================
@@ -74,7 +73,7 @@ export function startRun(ids) {
 function makeArm(id) {
   const w = WEAPONS.find(x => x.id === id);
   return {
-    id, w, d: ARMS[id], lv: w ? armLevel(id) : 1,
+    id, w, d: ARMS[id], lv: w ? armLevel(state.inv[id]) : 1,
     col: w ? RAR[w.r].color : '#f3efe6', img: w ? sprite(w) : null,
     cd: Math.random() * .4, ang: Math.random() * TAU, hits: new WeakMap(), gp: galaxyOn(id),
   };
@@ -556,14 +555,14 @@ function updateFx(dt) {
 /* ---------- 그리기 ---------- */
 const hash = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 function drawGround(cx, cy) {
-  const th = curTheme(), T = 80, hw = W / 2 / zoom, hh = H / 2 / zoom;
+  const T = 80, hw = W / 2 / zoom, hh = H / 2 / zoom;
   const x0 = Math.floor((cx - hw) / T) - 1, x1 = Math.ceil((cx + hw) / T), y0 = Math.floor((cy - hh) / T) - 1, y1 = Math.ceil((cy + hh) / T);
   for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) {
-    ctx.fillStyle = (i + j) & 1 ? th.a : th.b; ctx.fillRect(i * T, j * T, T + .5, T + .5);
+    ctx.fillStyle = (i + j) & 1 ? '#0c3337' : '#0b2f33'; ctx.fillRect(i * T, j * T, T + .5, T + .5);
     const h = hash(i, j), x = i * T + 10 + hash(j, i) * 60, y = j * T + 10 + h * 60;
-    if (h < .1) { ctx.fillStyle = th.spot; ctx.beginPath(); ctx.ellipse(x, y, 7, 4.5, 0, 0, TAU); ctx.fill(); }
-    else if (h < .2) { ctx.strokeStyle = th.grass; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x - 7, y - 8); ctx.moveTo(x, y); ctx.lineTo(x, y - 10); ctx.moveTo(x + 5, y); ctx.lineTo(x + 7, y - 8); ctx.stroke(); }
-    else if (h < .23) { ctx.fillStyle = th.spark; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }
+    if (h < .1) { ctx.fillStyle = '#134a50'; ctx.beginPath(); ctx.ellipse(x, y, 7, 4.5, 0, 0, TAU); ctx.fill(); }
+    else if (h < .2) { ctx.strokeStyle = '#1d6458'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x - 7, y - 8); ctx.moveTo(x, y); ctx.lineTo(x, y - 10); ctx.moveTo(x + 5, y); ctx.lineTo(x + 7, y - 8); ctx.stroke(); }
+    else if (h < .23) { ctx.fillStyle = '#ffc83d33'; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }
   }
 }
 function circle(x, y, r, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
@@ -663,8 +662,13 @@ function drawPlayer(p) {
   const bob = Math.abs(Math.sin(p.walk)) * 3;
   shadow(p.x, p.y + p.r * .9, p.r);
   if (p.inv > 0 && Math.floor(G.t * 20) % 2) return;
-  ctx.save(); ctx.translate(p.x, p.y - bob);
-  paintHero(ctx, p.r, curSkin(), { ox: Math.cos(p.face) * 4, oy: Math.sin(p.face) * 3, hurt: p.hurt > 0, t: G.t });
+  ctx.save(); ctx.translate(p.x, p.y - bob); ctx.rotate(-.42);
+  circle(0, 0, p.r, p.hurt > 0 ? '#ffb3b3' : '#f3efe6');
+  ctx.fillStyle = '#e8364f'; ctx.beginPath(); ctx.arc(0, 0, p.r, Math.PI, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#b8203a'; ctx.fillRect(-p.r, -1, p.r * 2, 3);
+  ctx.rotate(.42);
+  const ox = Math.cos(p.face) * 4, oy = Math.sin(p.face) * 3;
+  circle(-4 + ox, 5 + oy, 2.2, '#14161c'); circle(4 + ox, 5 + oy, 2.2, '#14161c');
   ctx.restore();
   if (p.shield > 0) { ctx.strokeStyle = 'rgba(138,223,255,.8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y - bob, p.r + 6, 0, TAU); ctx.stroke(); }
 }

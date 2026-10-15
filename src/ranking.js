@@ -1,5 +1,4 @@
 import { RANKING, TEST_MODE } from './config.js';
-import { monthKey } from './state.js';
 
 /* =========================================================
    회원(아이디 + 비밀번호)과 월간 전투 랭킹 (Supabase REST)
@@ -60,13 +59,12 @@ export async function logIn(id, pw) {
   const { data } = await req('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: toEmail(id), password: pw } });
   setSession(await withProfile(fromAuth(data)));
 }
-// 서버 프로필에서 아이디(대소문자 그대로)와 슈퍼계정·관리 계정 여부를 붙인다
+// 서버 프로필에서 아이디(대소문자 그대로)와 슈퍼계정 여부를 붙인다
 async function withProfile(s) {
   try {
     const rows = (await req(`/rest/v1/profiles?id=eq.${s.uid}&select=username,is_super,hide_rank`, { token: s.token })).data;
     if (rows?.[0]) { s.username = rows[0].username; s.super = !!rows[0].is_super; s.hideRank = !!rows[0].hide_rank; }
   } catch (e) {}
-  try { s.ctl = !!(await req('/rest/v1/rpc/ctl_sync', { method: 'POST', token: s.token, body: {} })).data; } catch (e) {}
   return s;
 }
 export function logOut() {
@@ -79,7 +77,7 @@ async function token() {
   if (Date.now() < session.exp) return session.token;
   try {
     const { data } = await req('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh } });
-    setSession({ ...fromAuth(data, session.username), super: session.super, hideRank: session.hideRank, ctl: session.ctl });
+    setSession({ ...fromAuth(data, session.username), super: session.super, hideRank: session.hideRank });
     return session.token;
   } catch (e) { if (e.status === 400 || e.status === 401) setSession(null); return null; }
 }
@@ -105,31 +103,9 @@ export async function submitWave(wave, kills) {
   return session.hideRank ? 'hidden' : 'ok';
 }
 
-// 관리 계정: 지금 상태를 올리고, 대시보드에서 바꾼 값 { rev, patch }을 받는다 (관리 계정이 아니면 null, 실패하면 undefined)
-export async function ctlSync(snapshot, rev) {
-  if (!rankReady() || !session) return undefined;
-  const t = await token(); if (!t) return undefined;
-  try { return (await req('/rest/v1/rpc/ctl_sync', { method: 'POST', token: t, body: { p_snapshot: snapshot, p_rev: rev } })).data; }
-  catch (e) { return undefined; }
-}
-// 관리 계정 여부가 바뀌면 저장 칸을 바꾸도록 알린다 (onAuth → syncSlot)
-export function setCtl(on) { if (session && !!session.ctl !== on) setSession({ ...session, ctl: on }); }
-
 const ORDER = 'order=wave.desc,kills.desc,updated_at.asc';
 export async function fetchTop(month, limit = 50) {
   return (await req(`/rest/v1/wave_rank_view?month=eq.${month}&select=user_id,username,wave,kills&${ORDER}&limit=${limit}`)).data;
-}
-// 내가 1위로 마친 지난 달 (이번 달은 아직 안 끝났으니 빼고, known에 있는 달은 다시 안 봄)
-export async function fetchChampMonths(known = []) {
-  if (!rankReady() || !session) return [];
-  const mine = (await req(`/rest/v1/wave_rank_view?user_id=eq.${session.uid}&month=lt.${monthKey()}&select=month`)).data || [];
-  const won = [];
-  for (const { month } of mine) {
-    if (known.includes(month)) continue;
-    const [top] = await fetchTop(month, 1);
-    if (top?.user_id === session.uid) won.push(month);
-  }
-  return won;
 }
 export async function fetchMine(month) {
   if (!session) return null;

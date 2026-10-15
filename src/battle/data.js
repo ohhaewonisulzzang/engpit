@@ -6,19 +6,9 @@ import { state } from '../state.js';
 export const MAX_EQUIP = 3;      // 전투에 들고 갈 수 있는 무기 수
 export const WAVE_LEN = 40;      // 웨이브마다 보스가 나오기까지 버티는 시간(초)
 
-// 전투 레벨 = 1 + 조각으로 올린 단계 (무기는 하나씩만 가진다)
+// 같은 무기를 여러 개 가질수록 전투 레벨이 올라간다 (분해하면 내려감)
 export const MAX_ARM_LV = 11;
-export const armLevel = id => Math.min(1 + (state.inv[id] ? state.armUp?.[id] || 0 : 0), MAX_ARM_LV);
-// 조각으로 전투 레벨 1 올리기: 높은 등급일수록, 레벨이 높을수록 비싸다
-export const armUpCost = w => ({ rare: 2, super: 3, hero: 5, legend: 8, ultra: 12 }[w.r]) * armLevel(w.id);
-export function buyArmUp(w) {
-  if (!state.inv[w.id] || armLevel(w.id) >= MAX_ARM_LV) return false;
-  const cost = armUpCost(w);
-  if (state.shards < cost) return false;
-  state.shards -= cost;
-  state.armUp = { ...state.armUp, [w.id]: (state.armUp?.[w.id] || 0) + 1 };
-  return true;
-}
+export const armLevel = n => Math.max(1, Math.min(n || 1, MAX_ARM_LV));
 export const lvMult = lv => 1 + .12 * (lv - 1);
 
 // kind: swing(앞쪽 휘두르기) | spin(360도 베기) | shot(던지기) | orbit(주위를 돎) | nova(사방으로 발사)
@@ -174,7 +164,7 @@ export const galaxyOn = id => GALAXY[id] && state.galaxy?.[id] && !state.gpOff?.
 export function galaxyState(w) {
   if (!GALAXY[w.id] || !state.inv[w.id]) return 'none';
   if (state.galaxy?.[w.id]) return state.gpOff?.[w.id] ? 'off' : 'on';
-  return armLevel(w.id) >= GALAXY_LV ? 'buy' : 'locked';
+  return armLevel(state.inv[w.id]) >= GALAXY_LV ? 'buy' : 'locked';
 }
 // 해금하면 바로 착용된다
 export function unlockGalaxy(w) {
