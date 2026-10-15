@@ -221,20 +221,12 @@ export function bossFor(wave) {
 export const waveHp = wave => 1 + .35 * (wave - 1);
 export const waveDmg = wave => 1 + .12 * (wave - 1);
 
-// 하드 모드(프로): 조각을 내고 들어가는 극악 난이도. 단계마다 높은 웨이브에서 시작하고 적이 더 세다
-// 시작 웨이브부터 PRO_GOAL개 웨이브를 클리어하면 그 단계 클리어 → 다음 단계가 열린다 (판은 쓰러질 때까지 계속)
-// 하드 모드에서는 조각이 떨어지지 않는다. 기록은 프로랭킹에 올라간다 (시작 웨이브는 supabase/pro_ranking.sql과 같아야 함)
-export const PRO_STAGES = [
-  { name: '하드 Ⅰ', start: 30,  cost: 40 },
-  { name: '하드 Ⅱ', start: 45,  cost: 70 },
-  { name: '하드 Ⅲ', start: 60,  cost: 110 },
-  { name: '하드 Ⅳ', start: 80,  cost: 160 },
-  { name: '하드 Ⅴ', start: 100, cost: 240 },
-];
-export const PRO_GOAL = 5;
-export const PRO_HP = 1.6, PRO_DMG = 1.4; // 웨이브 배율 위에 더 곱하는 적 체력·공격력 배율
-export const proOpen = i => FREE || i <= (state.proClear || 0);
-export const proCost = i => FREE ? 0 : PRO_STAGES[i].cost;
+// 하드 모드(프로): 조각을 내고 들어가는 어려운 전투. 일반 전투처럼 웨이브 1부터 시작하고(효과도 똑같이 고름),
+// 적 체력·공격력이 1.3배씩 세다 (합쳐서 일반의 약 1.7배). 조각은 떨어지지 않고, 기록은 프로랭킹에 올라간다
+// (서버 규칙은 supabase/pro_ranking_v2.sql)
+export const PRO_HP = 1.3, PRO_DMG = 1.3; // 웨이브 배율 위에 더 곱하는 적 체력·공격력 배율
+export const PRO_COST = 40;               // 입장 조각
+export const proCost = () => FREE ? 0 : PRO_COST;
 
 // 웨이브를 버티면 셋 중 하나를 고르는 효과
 export const PERKS = [

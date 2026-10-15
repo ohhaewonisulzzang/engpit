@@ -7,7 +7,7 @@ import { sprite } from '../ui/dex.js';
 import { curSkin, curTheme, paintHero } from '../shop.js';
 import { PRO_GRAD, proYears } from '../titles.js';
 import { FX, drawFx } from './fx.js'; // 이펙트 스프라이트 시트 (불러오면 미리 받아 둔다)
-import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg, galaxyOn, PRO_STAGES, PRO_GOAL, PRO_HP, PRO_DMG } from './data.js';
+import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg, galaxyOn, PRO_HP, PRO_DMG } from './data.js';
 
 /* =========================================================
    전투 (탕탕특공대식 핵앤슬래시)
@@ -52,7 +52,7 @@ cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', e
 
 /* ---------- 판 시작 / 끝 ---------- */
 export function startRun(ids, pro = null) {
-  const start = pro == null ? 1 : PRO_STAGES[pro].start;
+  const start = 1; // 하드 모드도 웨이브 1부터
   G = {
     pro, start, t: 0, wave: start, waveT: 0, phase: 'fight', paused: false, clearT: 0,
     p: { x: 0, y: 0, r: 14, hp: 120, maxHp: 120, face: 0, inv: 0, hurt: 0, walk: 0 },
@@ -73,7 +73,7 @@ export function startRun(ids, pro = null) {
   G.shieldT = 0; G.p.shield = 0;
   if (!W) fit();
   waveStart();
-  hooks.banner?.(pro == null ? '웨이브 1' : `${PRO_STAGES[pro].name} · 웨이브 ${start}`, pro == null ? '#ffc83d' : '#ff5a1f');
+  hooks.banner?.(pro == null ? '웨이브 1' : '하드 모드 · 웨이브 1', pro == null ? '#ffc83d' : '#ff5a1f');
 }
 function makeArm(id) {
   const w = WEAPONS.find(x => x.id === id);
@@ -110,7 +110,7 @@ function gameOver(gaveUp) {
   const rec = G.wave > best.wave || (G.wave === best.wave && G.kills > best.kills);
   if (rec) state[key] = { wave: G.wave, kills: G.kills };
   save();
-  const sum = { wave: G.wave, kills: G.kills, shards: G.shards, time: G.t, rec, gaveUp, pro: G.pro, cleared: !!G.proCleared };
+  const sum = { wave: G.wave, kills: G.kills, shards: G.shards, time: G.t, rec, gaveUp, pro: G.pro };
   setTimeout(() => hooks.end?.(sum), gaveUp ? 0 : 1300);
 }
 
@@ -291,13 +291,7 @@ function startClear() {
   G.phase = 'clear'; G.clearT = 0;
   for (const e of G.enemies) if (!e.dead) { e.dead = true; puff(e.x, e.y, e.col, 6, 100); }
   G.bullets.length = 0;
-  // 하드 모드: 시작 웨이브부터 PRO_GOAL개를 깨면 단계 클리어, 다음 단계가 열린다
-  const st = PRO_STAGES[G.pro];
-  if (st && !G.proCleared && G.wave - G.start + 1 >= PRO_GOAL) {
-    G.proCleared = true;
-    state.proClear = Math.max(state.proClear || 0, G.pro + 1);
-    hooks.banner?.(`${st.name} 클리어!${PRO_STAGES[G.pro + 1] ? ' 다음 단계가 열렸어요' : ''}`, '#ff5a1f');
-  } else hooks.banner?.(`웨이브 ${G.wave} 클리어!`, '#4fd18b');
+  hooks.banner?.(`웨이브 ${G.wave} 클리어!`, '#4fd18b');
   // 지옥 스킨: 1등 한 해 숫자가 몸 주위를 돌다가 흡수되는 마무리 모션
   const year = proYears().at(-1);
   G.finale = curSkin().finale && year ? { t: 0, text: year, done: false } : null;

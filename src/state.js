@@ -23,7 +23,6 @@ export const DEFAULT = () => ({
   titles: {},  // 보상을 받은 칭호 { 칭호 id: true }
   title: null, // 대표 칭호 id
   champ: [],   // 전투 랭킹을 1위로 마친 달 ['2026-10'] (칭호 '랭킹 1위')
-  proClear: 0,   // 하드 모드에서 클리어한 단계 수 (다음 단계가 열림)
   proBest: null, // 하드 모드 최고 기록 { wave, kills }
   proChamp: [],  // 프로랭킹을 1위로 마친 달 ['2026-10'] (칭호 '20XX년 프로랭킹 1등', 지옥 스킨)
   metas: [],   // 메타: 무기 3개 조합 [{ id, name, arms }] (meta.js, 최대 10개)

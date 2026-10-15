@@ -9,7 +9,7 @@ import { metas, equipMeta, isWorn } from '../meta.js';
 import { galaxyHTML, bindGalaxy } from './galaxy.js';
 import { beginRun, submitWave, submitPro, session, rankReady } from '../ranking.js';
 import { G, hooks, startRun, choosePerk, setPaused, quitRun, clearRun } from '../battle/game.js';
-import { ARMS, KIND_NAME, MAX_EQUIP, PERKS, WAVE_LEN, MAX_ARM_LV, armLevel, lvMult, galaxyOn, PRO_STAGES, PRO_GOAL, proOpen, proCost } from '../battle/data.js';
+import { ARMS, KIND_NAME, MAX_EQUIP, PERKS, WAVE_LEN, MAX_ARM_LV, armLevel, lvMult, galaxyOn, PRO_HP, PRO_DMG, proCost } from '../battle/data.js';
 
 /* =========================================================
    전투 화면: 무기 장착(로비), HUD, 웨이브 효과 고르기, 결과
@@ -26,23 +26,16 @@ export function equipped() {
   return state.equip;
 }
 const power = id => Math.round(ARMS[id].dmg * lvMult(armLevel(id)));
-// 하드 모드에서 고른 단계 (열린 가장 높은 단계가 기본)
-let proSel = null;
-const selStage = () => { if (proSel == null || !proOpen(proSel)) proSel = Math.min(state.proClear || 0, PRO_STAGES.length - 1); return proSel; };
+// 하드 모드: 일반 전투처럼 웨이브 1부터, 적만 더 세다 (battle/data.js의 PRO_HP·PRO_DMG)
+const pct = k => Math.round((k - 1) * 100);
 function hardHTML() {
-  const sel = selStage(), cost = proCost(sel), pb = state.proBest;
-  const stage = (st, i) => {
-    const open = proOpen(i), clear = i < (state.proClear || 0);
-    return `<button class="stage${i === sel ? ' on' : ''}${clear ? ' clear' : ''}" data-stage="${i}" ${open ? '' : 'disabled'}>
-      <b>${st.name}</b><small>${open ? `웨이브 ${st.start}부터` : '앞 단계를 깨면 열려요'}</small><small><i class="si"></i>${st.cost}</small></button>`;
-  };
+  const cost = proCost(), pb = state.proBest;
   return `<div class="hard">
     <div class="hard-head"><div><b>하드 모드</b>
-      <p>조각을 내고 들어가는 극악 난이도예요. 높은 웨이브에서 시작하고 적이 훨씬 세며, 조각이 떨어지지 않아요. 웨이브 ${PRO_GOAL}개를 클리어하면 다음 단계가 열려요. 기록은 <b>프로랭킹</b>에 올라가요.</p></div>
+      <p>조각을 내고 들어가는 어려운 전투예요. 일반 전투처럼 웨이브 1부터 시작하지만 적의 체력과 공격력이 ${pct(PRO_HP)}%씩 더 세고, 조각이 떨어지지 않아요. 기록은 <b>프로랭킹</b>에 올라가요.</p></div>
       <div class="hard-best"><b>${pb ? pb.wave : 0}</b>하드 최고 웨이브</div></div>
-    <div class="stages">${PRO_STAGES.map(stage).join('')}</div>
     <div class="hard-go"><span>가진 조각 <i class="si"></i>${state.shards}</span>
-      <button class="btn hell" id="bHard" ${state.shards >= cost ? '' : 'disabled'}>${PRO_STAGES[sel].name} 출격 · 조각 ${PRO_STAGES[sel].cost}${cost ? '' : ' (무료)'}</button></div>
+      <button class="btn hell" id="bHard" ${state.shards >= cost ? '' : 'disabled'}>하드 모드 출격 · 조각 ${cost || '무료'}</button></div>
   </div>`;
 }
 
@@ -93,9 +86,7 @@ export function renderBattle() {
 bindGalaxy($('bLobby'), renderBattle);
 $('bLobby').onclick = e => {
   if (e.target.closest('#bStart')) return go();
-  if (e.target.closest('#bHard')) return go(selStage());
-  const sb = e.target.closest('[data-stage]');
-  if (sb) { proSel = +sb.dataset.stage; SFX.tick(); return renderBattle(); }
+  if (e.target.closest('#bHard')) return go(0);
   if (e.target.closest('[data-gp-buy],[data-gp-toggle]')) return;
   const mb = e.target.closest('[data-meta]');
   if (mb) {
@@ -114,11 +105,11 @@ $('bLobby').onclick = e => {
   } else return;
   save(); SFX.tick(); renderBattle();
 };
-// pro: 하드 모드 단계 번호 (없으면 일반 전투). 하드 모드는 출격할 때마다 조각을 낸다
+// pro: 하드 모드면 0 (없으면 일반 전투). 하드 모드는 출격할 때마다 조각을 낸다
 function go(pro = null) {
   if (pro != null) {
-    const cost = proCost(pro);
-    if (!proOpen(pro) || state.shards < cost) { SFX.wrong(); toast('조각이 모자라요'); return; }
+    const cost = proCost();
+    if (state.shards < cost) { SFX.wrong(); toast('조각이 모자라요'); return; }
     state.shards -= cost; save();
   }
   clearRun(); startRun(equipped(), pro);
@@ -133,7 +124,7 @@ hooks.hud = g => {
   const p = g.p;
   $('bHp').style.width = Math.max(0, p.hp / p.maxHp * 100) + '%';
   $('bHpT').textContent = `${Math.ceil(p.hp)} / ${p.maxHp}`;
-  $('bWave').textContent = g.pro == null ? `웨이브 ${g.wave}` : `${PRO_STAGES[g.pro].name} · 웨이브 ${g.wave}`;
+  $('bWave').textContent = g.pro == null ? `웨이브 ${g.wave}` : `하드 · 웨이브 ${g.wave}`;
   $('bTime').textContent = { fight: `보스까지 ${Math.ceil(WAVE_LEN - g.waveT)}초`, boss: '보스를 쓰러뜨리세요!', clear: '클리어!' }[g.phase] || '';
   $('bShards').textContent = g.shards; $('bKills').textContent = g.kills;
   const b = g.boss; $('bBoss').hidden = !b;
@@ -173,11 +164,11 @@ $('bPauseBtn').onclick = () => setPaused(true);
 
 hooks.end = s => {
   $('bhud').hidden = true; $('bBanner').className = 'bbanner'; show('bPerk', false); show('bPause', false);
-  const pro = s.pro != null, st = PRO_STAGES[s.pro], board = pro ? '프로랭킹' : '랭킹';
-  const cost = pro ? proCost(s.pro) : 0, retry = pro ? `다시 도전 · 조각 ${st.cost}${cost ? '' : ' (무료)'}` : '다시 도전';
-  $('bEnd').innerHTML = `<div class="bp-box"><h2>${pro ? `${st.name} · ` : ''}${s.gaveUp ? '전투 종료' : '쓰러졌어요'}</h2>${s.cleared ? `<div class="rec">${st.name} 클리어!</div>` : ''}${s.rec ? '<div class="rec">최고 기록!</div>' : ''}
+  const pro = s.pro != null, board = pro ? '프로랭킹' : '랭킹';
+  const cost = pro ? proCost() : 0, retry = pro ? `다시 도전 · 조각 ${cost || '무료'}` : '다시 도전';
+  $('bEnd').innerHTML = `<div class="bp-box"><h2>${pro ? '하드 모드 · ' : ''}${s.gaveUp ? '전투 종료' : '쓰러졌어요'}</h2>${s.rec ? '<div class="rec">최고 기록!</div>' : ''}
     <div class="end-stats"><div><b>${s.wave}</b>웨이브</div><div><b>${s.kills}</b>처치</div><div><b>${fmt(s.time)}</b>버틴 시간</div>${pro ? '' : `<div><b><i class="si"></i>${s.shards}</b>얻은 조각</div>`}</div>
-    <p>${pro ? `웨이브 ${st.start + PRO_GOAL - 1}까지 클리어하면 다음 단계가 열려요.` : '조각은 도감 탭에서 행운과 뽑기 기계 업그레이드에 쓸 수 있어요.'}</p>
+    <p>${pro ? '하드 모드 기록은 이번 달 프로랭킹에 올라가요.' : '조각은 도감 탭에서 행운과 뽑기 기계 업그레이드에 쓸 수 있어요.'}</p>
     <p class="rk-sent" id="bRank">${rankReady() ? (session ? `${board}에 기록을 올리는 중…` : `로그인하면 이 기록이 이번 달 ${board}에 올라가요 (랭킹 탭)`) : ''}</p>
     <div class="fg-btns center"><button class="btn" id="bToLobby">무기 바꾸기</button><button class="btn ${pro ? 'hell' : 'primary'}" id="bRetry" ${state.shards >= cost ? '' : 'disabled'}>${retry}</button></div></div>`;
   show('bEnd', true);
