@@ -1,10 +1,14 @@
 // 저장 데이터 (브라우저 localStorage)
+// 일반 계정으로 로그인하면 'engpit_save_u_<id>'에 저장하고 서버(cloud.js)와 맞춘다. 서버 것이 진짜이고 이건 기기에 둔 사본
 // 슈퍼계정·관리 계정으로 로그인하면 따로 저장해서, 같은 브라우저의 일반 진행 상황과 섞이지 않게 한다
+// 로그인하지 않으면 'engpit_save_v1' (예전에는 로그인해도 이걸 써서 기기마다 진행이 따로 놀았음)
 export const SLOT_KEY = 'engpit_slot';
 const slot = (() => { try { return localStorage.getItem(SLOT_KEY); } catch (e) { return null; } })();
-export const SLOT = slot; // 'super_<id>' | 'ctl_<id>' | null
+export const SLOT = slot; // 'u_<id>' | 'super_<id>' | 'ctl_<id>' | null
 export const SUPER = !!slot?.startsWith('super_');
-export const SAVE_KEY = slot ? 'engpit_save_' + slot : 'engpit_save_v1';
+export const CLOUD = !!slot?.startsWith('u_');
+export const GUEST_KEY = 'engpit_save_v1';
+export const SAVE_KEY = slot ? 'engpit_save_' + slot : GUEST_KEY;
 export const DEFAULT = () => ({
   coins: 3, inv: {}, pulls: 0, correct: 0, wrong: 0, custom: [], missed: {},
   level: 1, // 뽑기 기계 레벨 (조각으로 업그레이드)
@@ -22,18 +26,30 @@ export const DEFAULT = () => ({
   shop: {},    // 상점에서 산 것 { 'skin:gold': true } (칭호는 titles에)
   skin: 'basic', theme: 'basic', sfx: 'basic', // 쓰는 중인 캐릭터 스킨·배경 테마·정답 효과음 (shop.js)
   ctlRev: 0,   // 관리 계정: 대시보드에서 바꾼 값을 몇 번째까지 적용했는지 (control.js)
+  cloudRev: 0, cloudDirty: false, // 일반 계정: 마지막으로 서버와 맞춘 저장 번호, 그 뒤에 바뀐 게 있는지 (cloud.js)
 });
-export const state = (() => {
-  try {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && typeof s.coins === 'number') return Object.assign(DEFAULT(), s);
-  } catch (e) {}
-  return DEFAULT();
-})();
+const load = k => { try { const s = JSON.parse(localStorage.getItem(k)); if (s && typeof s.coins === 'number') return s; } catch (e) {} return null; };
+// 이 브라우저에서 계정으로 처음 로그인: 예전 저장을 가져와 둔다. 서버에 그 계정 저장이 없을 때만 올라가고 (cloud.js)
+// 서버에 이미 있으면 서버 것으로 바뀐다
+export const FROM_GUEST = CLOUD && !load(SAVE_KEY) && !!load(GUEST_KEY);
+export const state = Object.assign(DEFAULT(), load(SAVE_KEY) || (FROM_GUEST && { ...load(GUEST_KEY), cloudRev: 0, cloudDirty: true }) || {});
 // 저장할 때마다 부를 함수 (관리 계정이 바뀐 상태를 서버에 바로 올릴 때 씀, control.js)
 const saveHooks = new Set();
 export const onSave = f => saveHooks.add(f);
-export function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} saveHooks.forEach(f => f()); }
+export const writeLocal = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} };
+let locked = false;
+export const lockSave = () => { locked = true; }; // 서버 저장으로 다시 불러오기 직전: 더는 안 씀
+export function save() {
+  if (locked) return;
+  if (CLOUD) state.cloudDirty = true;
+  writeLocal(); saveHooks.forEach(f => f());
+}
+// 서버에서 받은 저장으로 통째로 바꾼다 (화면이 뜨기 전에, 또는 바꾼 뒤 새로고침)
+export function replaceState(data, rev) {
+  for (const k of Object.keys(state)) delete state[k];
+  Object.assign(state, DEFAULT(), data, { cloudRev: rev, cloudDirty: false });
+  writeLocal();
+}
 
 // 랭킹 시즌: 한국 시간 기준 한 달 ("2026-10")
 export const monthKey = (d = new Date()) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 7);

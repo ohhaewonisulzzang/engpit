@@ -679,3 +679,4 @@ main{margin-bottom:var(--navh)}
 .st-title{display:inline-block!important;cursor:default;font-size:14px;max-width:none}
 @media (max-width:520px){.st-head{flex-direction:column}.st-grid{grid-template-columns:repeat(2,1fr)}}
 .tchip.gold{color:#2b1d00;background:linear-gradient(135deg,#ffe27a,#ffc83d 45%,#ff9f1a);border-color:transparent;box-shadow:0 0 10px #ffc83d66}
+.cloud-gate{z-index:100}.cloud-gate .modal-box{padding:28px 24px;text-align:center;line-height:1.6;font-weight:600}.cloud-gate .btn{margin-top:16px}

@@ -23,9 +23,9 @@ function setSession(s) {
   listeners.forEach(f => f(s));
 }
 
-async function req(path, { method = 'GET', body, token, headers } = {}) {
+async function req(path, { method = 'GET', body, token, headers, keepalive } = {}) {
   const r = await fetch(BASE() + path, {
-    method, body: body && JSON.stringify(body),
+    method, body: body && JSON.stringify(body), keepalive,
     headers: { apikey: RANKING.key, Authorization: `Bearer ${token || RANKING.key}`, 'Content-Type': 'application/json', ...headers },
   });
   const txt = await r.text(); let data = null;
@@ -112,6 +112,14 @@ export async function ctlSync(snapshot, rev) {
   try { return (await req('/rest/v1/rpc/ctl_sync', { method: 'POST', token: t, body: { p_snapshot: snapshot, p_rev: rev } })).data; }
   catch (e) { return undefined; }
 }
+// 계정별 서버 저장 (supabase/cloud_save.sql). 로그인이 풀렸으면 'auth' 오류를 던진다
+async function rpc(name, body, opts) {
+  const t = await token(); if (!t) throw Object.assign(new Error('login required'), { code: session ? 'net' : 'auth' }); // 토큰을 못 받았는데 로그인이 남아 있으면 연결 문제
+  return (await req('/rest/v1/rpc/' + name, { method: 'POST', token: t, body, ...opts })).data;
+}
+export const loadSave = () => rpc('load_save', {});                         // { rev, data } | null
+export const putSave = (rev, data, keepalive) => rpc('put_save', { p_rev: rev, p_data: data }, { keepalive }); // { ok, rev, data? }
+
 // 관리 계정 여부가 바뀌면 저장 칸을 바꾸도록 알린다 (onAuth → syncSlot)
 export function setCtl(on) { if (session && !!session.ctl !== on) setSession({ ...session, ctl: on }); }
 
