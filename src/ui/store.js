@@ -10,21 +10,22 @@ import { toast, updateHUD, currentTab, esc } from './common.js';
    - 아이템마다 미리보기(캐릭터·바닥 그림, 소리 듣기, 칭호 모양)가 있다
    ========================================================= */
 let cat = 'skin';
+// 랭킹 1등 보상(지옥의 군주 스킨)은 상점에서 팔지 않으므로, 받은 사람에게만 (쓰기 버튼으로) 보인다
+const shownOf = k => CATS.find(x => x.key === k).list.filter(it => !it.pro || owns(k, it));
 const TAU = Math.PI * 2;
 
 export function renderStore() {
-  const c = CATS.find(x => x.key === cat);
-  const have = c.list.filter(it => owns(cat, it)).length;
+  const c = CATS.find(x => x.key === cat), list = shownOf(cat);
+  const have = list.filter(it => owns(cat, it)).length;
   $('storeHead').innerHTML = `<div><h2>코인 상점</h2>
       <p>단어 테스트에서 모은 코인으로 캐릭터와 배경, 효과음, 칭호를 바꿔 보세요. 산 아이템은 언제든 다시 바꿔 쓸 수 있어요.</p></div>
     <div class="st-wallet"><i class="ci"></i><b>${FREE ? '∞' : state.coins}</b></div>`;
   $('storeSeg').innerHTML = CATS.map(x => `<button data-cat="${x.key}"${x.key === cat ? ' class="on"' : ''}>${x.name}</button>`).join('');
-  $('storeNote').textContent = `${c.name} ${have}/${c.list.length}개 가짐`;
-  $('storeGrid').innerHTML = c.list.map(it => {
+  $('storeNote').textContent = `${c.name} ${have}/${list.length}개 가짐`;
+  $('storeGrid').innerHTML = list.map(it => {
     const own = owns(cat, it), on = using(cat, it);
     const btn = on ? `<button class="btn on" disabled>사용 중</button>`
       : own ? `<button class="btn" data-use="${it.id}">${cat === 'title' ? '달기' : '사용하기'}</button>`
-      : it.pro ? `<button class="btn" disabled>프로랭킹 1등 보상</button>`
       : `<button class="btn primary" data-buy="${it.id}" ${canBuy(it) ? '' : 'disabled'}>${canBuy(it) ? '구매' : '코인 부족'} <i class="ci"></i>${it.price}</button>`;
     return `<div class="st-card${on ? ' on' : ''}${own ? ' own' : ''}">
       <div class="st-pv">${preview(it)}</div>

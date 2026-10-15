@@ -13,7 +13,7 @@ const wave = () => state.best?.wave || 0;
 const maxed = () => WEAPONS.filter(w => state.inv[w.id] && armLevel(w.id) >= MAX_ARM_LV).length;
 const galaxies = () => Object.values(state.galaxy || {}).filter(Boolean).length;
 
-// now: 지금 값, goal: 목표, coins/shards: 보상
+// now: 지금 값, goal: 목표, coins/shards: 보상, secret: 랭킹 1등 보상이라 얻기 전에는 칭호 목록에 안 보임
 export const TITLES = [
   { id: 'pull1',    name: '첫 캡슐',        desc: '뽑기 1번',                 now: () => state.pulls,   goal: 1,   coins: 3 },
   { id: 'pull100',  name: '뽑기 중독',      desc: '뽑기 100번',               now: () => state.pulls,   goal: 100, shards: 60 },
@@ -31,7 +31,7 @@ export const TITLES = [
   { id: 'max1',     name: '한 우물',        desc: `무기 1종 전투 Lv.${MAX_ARM_LV}`, now: maxed, goal: 1, shards: 60 },
   { id: 'max5',     name: '무기고 관리인',  desc: `무기 5종 전투 Lv.${MAX_ARM_LV}`, now: maxed, goal: 5, shards: 250 },
   { id: 'galaxy1',  name: '별을 품은 자',   desc: '갤럭시 파워 1개 해금',      now: galaxies, goal: 1, shards: 40 },
-  { id: 'champ',    name: '랭킹 1위',       desc: '한 달 전투 랭킹을 1위로 마치기 (로그인 필요)', now: () => (state.champ || []).length, goal: 1, coins: 100, shards: 300, gold: true },
+  { id: 'champ',    name: '랭킹 1위',       desc: '한 달 전투 랭킹을 1위로 마치기 (로그인 필요)', now: () => (state.champ || []).length, goal: 1, coins: 100, shards: 300, gold: true, secret: true },
   { id: 'machine',  name: '기계공',         desc: '모든 뽑기 기계 열기',       now: () => state.level, goal: MAX_LEVEL, shards: 100 },
 ];
 // 코인 상점에서 사는 칭호 (shop.js). 조건 없이 사면 바로 얻는다
