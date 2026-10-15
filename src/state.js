@@ -26,6 +26,7 @@ export const DEFAULT = () => ({
   proClear: 0,   // 하드 모드에서 클리어한 단계 수 (다음 단계가 열림)
   proBest: null, // 하드 모드 최고 기록 { wave, kills }
   proChamp: [],  // 프로랭킹을 1위로 마친 달 ['2026-10'] (칭호 '20XX년 프로랭킹 1등', 지옥 스킨)
+  metas: [],   // 메타: 무기 3개 조합 [{ id, name, arms }] (meta.js, 최대 10개)
   shop: {},    // 상점에서 산 것 { 'skin:gold': true } (칭호는 titles에)
   skin: 'basic', theme: 'basic', sfx: 'basic', // 쓰는 중인 캐릭터 스킨·배경 테마·정답 효과음 (shop.js)
   ctlRev: 0,   // 관리 계정: 대시보드에서 바꾼 값을 몇 번째까지 적용했는지 (control.js)

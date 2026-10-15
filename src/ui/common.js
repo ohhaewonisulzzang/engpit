@@ -13,10 +13,11 @@ import { renderDex } from './dex.js';
 import { renderBattle, leaveBattle } from './battle.js';
 import { renderRanking, renderLogin } from './ranking.js';
 import { renderStore } from './store.js';
+import { renderMeta } from './meta.js';
 
 /* =========================================================
    UI 공통
-   - 화면(tab): gacha, battle, study, test, dex, store, rank, login
+   - 화면(tab): gacha, battle, meta, study, test, dex, store, rank, login
    - 위쪽 메뉴의 "단어"는 study/test 중 마지막에 본 화면으로 간다 (단어 탭 안에서 둘을 오감)
    ========================================================= */
 export let currentTab = 'gacha';
@@ -57,6 +58,7 @@ export function switchTab(tab) {
   if (tab === 'battle') renderBattle();
   if (tab === 'rank') renderRanking();
   if (tab === 'store') renderStore();
+  if (tab === 'meta') renderMeta();
   if (tab === 'login') renderLogin();
 }
 let toastT;
