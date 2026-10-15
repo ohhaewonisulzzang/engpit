@@ -1,5 +1,6 @@
 import { $ } from '../dom.js';
 import { state, save } from '../state.js';
+import { capColors } from '../market.js';
 import { tone, SFX } from '../sound.js';
 import { RAR } from '../config.js';
 import { WEAPONS } from '../three/weapons.js';
@@ -664,8 +665,9 @@ function drawPlayer(p) {
   if (p.inv > 0 && Math.floor(G.t * 20) % 2) return;
   ctx.save(); ctx.translate(p.x, p.y - bob); ctx.rotate(-.42);
   circle(0, 0, p.r, p.hurt > 0 ? '#ffb3b3' : '#f3efe6');
-  ctx.fillStyle = '#e8364f'; ctx.beginPath(); ctx.arc(0, 0, p.r, Math.PI, 0); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#b8203a'; ctx.fillRect(-p.r, -1, p.r * 2, 3);
+  const hat = capColors(G.t); // 상점에서 고른 모자
+  ctx.fillStyle = hat.cap; ctx.beginPath(); ctx.arc(0, 0, p.r, Math.PI, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = hat.band; ctx.fillRect(-p.r, -1, p.r * 2, 3);
   ctx.rotate(.42);
   const ox = Math.cos(p.face) * 4, oy = Math.sin(p.face) * 3;
   circle(-4 + ox, 5 + oy, 2.2, '#14161c'); circle(4 + ox, 5 + oy, 2.2, '#14161c');

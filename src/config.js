@@ -46,6 +46,13 @@ export const LUCK_MAX = 10;
 export const LUCK_BOOST = { ultra: .08, legend: .06, hero: .05, super: .03 }; // 행운 1단계당 배율
 export const luckCost = luck => 4 + luck * 3;                 // 다음 행운 단계 가격
 
+// 천장: 이 횟수째 뽑기까지 그 등급 이상이 한 번도 안 나오면 그 뽑기는 확정 (울트라가 레전더리보다 먼저)
+export const PITY = { legend: 50, ultra: 150 };
+// 한 번에 뽑기 횟수 (코인도 그만큼)
+export const MULTI = [10, 100];
+// 조각 교환소: 조각을 내고 그 등급 무기 하나를 확정으로 받는다
+export const EXCHANGE = { hero: 50, legend: 140, ultra: 380 };
+
 export function oddsNow() {
   const base = lvl().odds, L = state.luck || 0, o = {};
   let sum = 0;

@@ -37,6 +37,11 @@ export const DEFAULT = () => ({
   best: null,  // 전투 최고 기록 { wave, kills }
   galaxy: {},  // 해금한 갤럭시 파워 { 무기 id: true }
   gpOff: {},   // 해금했지만 벗어 둔 갤럭시 파워 { 무기 id: true }
+  pity: { legend: 0, ultra: 0 }, // 천장: 그 등급 이상이 안 나온 채로 뽑은 횟수
+  owned: {},   // 상점에서 산 꾸미기 { 아이템 id: true }
+  wear: { skin: 'basic', theme: 'basic', sfx: 'basic' }, // 지금 쓰는 꾸미기
+  titles: {},  // 보상을 받은 칭호 { 칭호 id: true }
+  title: null, // 이름 옆에 보이는 대표 칭호 id
 });
 export const state = (() => {
   try {

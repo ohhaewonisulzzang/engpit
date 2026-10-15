@@ -1,5 +1,6 @@
 import { $ } from '../dom.js';
 import { monthKey, SUPER, SLOT_KEY } from '../state.js';
+import { titleName } from '../market.js';
 import { TEST_MODE } from '../config.js';
 import { SFX } from '../sound.js';
 import { rankReady, session, onAuth, signUp, logIn, logOut, authError, ID_RULE, fetchTop, fetchMine } from '../ranking.js';
@@ -58,7 +59,7 @@ export function renderLogin() {
   const box = $('loginBox');
   if (session) {
     box.innerHTML = `<div class="auth-card">
-      <div class="auth-hello"><span class="auth-av">${esc(session.username[0].toUpperCase())}</span><div><b>${esc(session.username)}</b><small>${SUPER ? '슈퍼계정이에요. 코인이 무한이고 모든 무기·기계·갤럭시 파워가 열려 있어요.' : '로그인 중이에요. 전투 기록이 이번 달 랭킹에 올라가요.'}</small></div></div>
+      <div class="auth-hello"><span class="auth-av">${esc(session.username[0].toUpperCase())}</span><div><b>${esc(session.username)}${titleName() ? ` <span class="ttl">${titleName()}</span>` : ''}</b><small>${SUPER ? '슈퍼계정이에요. 코인이 무한이고 모든 무기·기계·갤럭시 파워가 열려 있어요.' : '로그인 중이에요. 전투 기록이 이번 달 랭킹에 올라가요.'}</small></div></div>
       <div class="auth-btns"><button class="btn primary" data-tab="rank">랭킹 보기</button><button class="btn" id="authOut">로그아웃</button></div></div>`;
     $('authOut').onclick = () => { logOut(); SFX.tick(); toast('로그아웃했어요'); };
     return;

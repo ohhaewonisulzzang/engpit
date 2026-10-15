@@ -11,6 +11,9 @@ import { MAX_ARM_LV, GALAXY } from './battle/data.js';
 import { loop } from './gacha.js';
 import { applyMachineTheme } from './three/machine.js';
 import { updateHUD, renderOdds } from './ui/common.js';
+import './ui/market.js';
+import './ui/multi.js';
+import { applyTheme } from './market.js';
 
 // 슈퍼계정: 모든 무기 최대 레벨, 모든 기계·행운·갤럭시 파워 해금 (새 무기가 생겨도 시작할 때 채움)
 if (SUPER) {
@@ -21,6 +24,7 @@ if (SUPER) {
 }
 
 applyMachineTheme(state.level);
+applyTheme();
 renderOdds();
 updateHUD();
 loop();

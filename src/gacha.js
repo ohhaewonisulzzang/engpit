@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { $ } from './dom.js';
 import { state, save } from './state.js';
-import { RARITIES, RAR, FREE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE } from './config.js';
+import { RARITIES, RAR, FREE, MAX_LEVEL, lvl, chanceOf, SHARD_VALUE, EXCLUSIVE_CHANCE, PITY } from './config.js';
 import { ac, SFX } from './sound.js';
 import { V3, glow, disposeObj, U } from './three/helpers.js';
 import { buildWeapon, WEAPONS } from './three/weapons.js';
@@ -26,25 +26,45 @@ export function rollRarity() {
   for (let i = RARITIES.length - 1; i >= 0; i--) { r -= chanceOf(RARITIES[i].key); if (r < 0) return RAR[RARITIES[i].key]; }
   return RAR.rare;
 }
+// 천장을 적용한 등급: 울트라가 PITY.ultra번째, 레전더리 이상이 PITY.legend번째 뽑기까지 안 나오면 확정
+function rollWithPity() {
+  const p = state.pity || (state.pity = { legend: 0, ultra: 0 });
+  let rar = rollRarity();
+  if (p.ultra + 1 >= PITY.ultra) rar = RAR.ultra;
+  else if (p.legend + 1 >= PITY.legend && rar.rank < RAR.legend.rank) rar = RAR.legend;
+  p.ultra = rar.key === 'ultra' ? 0 : p.ultra + 1;
+  p.legend = rar.rank >= RAR.legend.rank ? 0 : p.legend + 1;
+  return rar;
+}
+// 뽑기 한 번 (코인 1개). 연출 없이 결과만 정하고 저장은 부른 쪽에서
+export function rollOne() {
+  if (!FREE) state.coins--;
+  state.pulls++;
+  const rar = rollWithPity();
+  // 지금 기계 레벨 이하의 전용 칼이 그 등급에 있으면 EXCLUSIVE_CHANCE 확률로 전용 칼, 아니면 일반 무기
+  const ex = WEAPONS.filter(w => w.m && w.m <= state.level && w.r === rar.key);
+  const pool = ex.length && Math.random() < EXCLUSIVE_CHANCE ? ex : WEAPONS.filter(w => !w.m && w.r === rar.key);
+  const w = pool[Math.floor(Math.random() * pool.length)];
+  return { rar, w, isNew: grant(w) };
+}
+// 무기 하나를 받는다 (뽑기와 조각 교환소). 처음 받은 무기면 true, 전투 장착 칸이 비어 있으면 바로 장착
+export function grant(w) {
+  const isNew = !state.inv[w.id];
+  state.inv[w.id] = (state.inv[w.id] || 0) + 1;
+  if (isNew && Array.isArray(state.equip) && state.equip.length < MAX_EQUIP) state.equip.push(w.id);
+  return isNew;
+}
+export let multiOpen = false; // 한 번에 뽑기 결과를 보는 중 (ui/multi.js)
+export const setMultiOpen = v => { multiOpen = v; };
 export function startPull() {
-  if (pull || upgrading) return false;
+  if (pull || upgrading || multiOpen) return false;
   if (!FREE && state.coins < 1) {
     toast('코인이 없어요. 단어 테스트에서 한 문제 맞힐 때마다 1개씩 받을 수 있어요.');
     $('coinBox').classList.remove('shake'); void $('coinBox').offsetWidth; $('coinBox').classList.add('shake');
     SFX.wrong(); return false;
   }
   ac();
-  if (!FREE) state.coins--;
-  state.pulls++;
-  const rar = rollRarity();
-  // 지금 기계 레벨 이하의 전용 칼이 그 등급에 있으면 EXCLUSIVE_CHANCE 확률로 전용 칼, 아니면 일반 무기
-  const ex = WEAPONS.filter(w => w.m && w.m <= state.level && w.r === rar.key);
-  const pool = ex.length && Math.random() < EXCLUSIVE_CHANCE ? ex : WEAPONS.filter(w => !w.m && w.r === rar.key);
-  const w = pool[Math.floor(Math.random() * pool.length)];
-  const isNew = !state.inv[w.id];
-  state.inv[w.id] = (state.inv[w.id] || 0) + 1;
-  // 처음 뽑은 무기는 전투 장착 칸이 비어 있으면 바로 장착
-  if (isNew && Array.isArray(state.equip) && state.equip.length < MAX_EQUIP) state.equip.push(w.id);
+  const { rar, w, isNew } = rollOne();
   save(); updateHUD(); renderOdds();
   // 캡슐 색 연출 (높은 등급은 낮은 색에서 승급!)
   let seq = [rar.key];
@@ -252,7 +272,7 @@ $('autoDism').onchange = e => { auto.dism = e.target.checked; saveAuto(); };
    기계 업그레이드 연출: 덜덜 떨림 → 번쩍 하면서 새 기계로 바뀜
    ========================================================= */
 export function upgradeMachine(done) {
-  if (pull || upgrading || state.level >= MAX_LEVEL) return;
+  if (pull || upgrading || multiOpen || state.level >= MAX_LEVEL) return;
   state.level++; save();
   $('pullBtn').disabled = true; $('pullbar').style.opacity = 0;
   upgrading = { t: 0, swapped: false, done };
