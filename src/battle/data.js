@@ -222,10 +222,10 @@ export const waveHp = wave => 1 + .35 * (wave - 1);
 export const waveDmg = wave => 1 + .12 * (wave - 1);
 
 // 하드 모드(프로): 조각을 내고 들어가는 어려운 전투. 일반 전투처럼 웨이브 1부터 시작하고(효과도 똑같이 고름),
-// 적 체력·공격력이 1.3배씩 세다 (합쳐서 일반의 약 1.7배). 조각은 떨어지지 않고, 기록은 프로랭킹에 올라간다
+// 적 체력·공격력이 1.65배씩 세다 (합쳐서 일반의 약 2.7배). 조각은 떨어지지 않고, 기록은 프로랭킹에 올라간다
 // (서버 규칙은 supabase/pro_ranking_v2.sql)
-export const PRO_HP = 1.3, PRO_DMG = 1.3; // 웨이브 배율 위에 더 곱하는 적 체력·공격력 배율
-export const PRO_COST = 40;               // 입장 조각
+export const PRO_HP = 1.65, PRO_DMG = 1.65; // 웨이브 배율 위에 더 곱하는 적 체력·공격력 배율
+export const PRO_COST = 50000;             // 입장 조각
 export const proCost = () => FREE ? 0 : PRO_COST;
 
 // 웨이브를 버티면 셋 중 하나를 고르는 효과
