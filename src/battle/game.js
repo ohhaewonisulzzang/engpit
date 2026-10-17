@@ -6,6 +6,7 @@ import { WEAPONS } from '../three/weapons.js';
 import { sprite } from '../ui/dex.js';
 import { curSkin, curTheme, paintHero } from '../shop.js';
 import { PRO_GRAD, proYears } from '../titles.js';
+import { settings, pixelRatio, partK, onSettings } from '../settings.js';
 import { FX, drawFx } from './fx.js'; // 이펙트 스프라이트 시트 (불러오면 미리 받아 둔다)
 import { ARMS, ENEMIES, PERKS, WAVE_LEN, armLevel, lvMult, bossFor, waveHp, waveDmg, galaxyOn, PRO_HP, PRO_DMG } from './data.js';
 
@@ -23,10 +24,12 @@ const cv = $('bcv'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1, zoom = 1;
 function fit() {
   W = cv.clientWidth; H = cv.clientHeight; if (!W || !H) return;
-  DPR = Math.min(devicePixelRatio, 2); cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  DPR = pixelRatio(); cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   zoom = Math.max(.75, Math.min(1.25, Math.min(W, H) / 560));
 }
 new ResizeObserver(fit).observe(cv);
+onSettings(() => { if (W) fit(); }); // 렌더링 해상도를 바꾸면 캔버스 크기를 다시 잡는다
+const lowQ = () => settings.quality === 'low';
 const visible = () => cv.offsetParent !== null;
 
 const TAU = Math.PI * 2;
@@ -341,7 +344,7 @@ function drawFinale() {
     const col = gradAt(i / chars.length + G.t * .6);
     ctx.save(); ctx.translate(x, y); // 글자는 똑바로 세운 채 원을 따라 돈다
     ctx.globalAlpha = appear * (1 - ein * .85);
-    ctx.shadowColor = col; ctx.shadowBlur = 12 * gold;
+    ctx.shadowColor = col; ctx.shadowBlur = lowQ() ? 0 : 12 * gold;
     ctx.strokeStyle = 'rgba(40,8,4,.75)'; ctx.lineWidth = 3; ctx.strokeText(ch, 0, 0);
     ctx.fillStyle = col; ctx.fillText(ch, 0, 0);
     if (gold < 1) { ctx.globalAlpha *= 1 - gold; ctx.shadowBlur = 0; ctx.fillStyle = '#ffffff'; ctx.fillText(ch, 0, 0); }
@@ -469,7 +472,7 @@ function updateShots(dt) {
       if (s.t > .55 && !s.back) { s.back = true; s.hit.clear(); }
     }
     s.x += s.vx * dt; s.y += s.vy * dt;
-    if (d.fire && Math.random() < .6) G.parts.push({ x: s.x, y: s.y, vx: rand(-20, 20), vy: rand(-20, 20), life: .3, max: .3, col: '#ffb020', r: 4 });
+    if (d.fire && settings.vfx && Math.random() < .6 * partK()) G.parts.push({ x: s.x, y: s.y, vx: rand(-20, 20), vy: rand(-20, 20), life: .3, max: .3, col: '#ffb020', r: 4 });
     for (const e of G.enemies) {
       if (e.dead || s.hit.has(e) || (e.x - s.x) ** 2 + (e.y - s.y) ** 2 > (e.r + s.r) ** 2) continue;
       if (d.explode) { explode(s.x, s.y, s.a); s.life = 0; break; }
@@ -483,17 +486,21 @@ function updateShots(dt) {
 }
 
 /* ---------- 이펙트 ---------- */
+// 이펙트를 끄면(settings.vfx) 파티클·고리·한 번 터지는 스프라이트·화면 흔들림이 없어지고, 무기 공격 모양(휘두르기·찌르기·번개)만 남는다
 function puff(x, y, col, n, sp) {
+  if (!settings.vfx) return;
+  n = Math.max(1, Math.round(n * partK()));
   for (let i = 0; i < n && G.parts.length < 500; i++) {
     const a = Math.random() * TAU, v = sp * (.3 + Math.random() * .7);
     G.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(.3, .7), max: .7, col, r: rand(2, 4.5) });
   }
 }
-const ring = (x, y, r0, r1, col, dur) => G.fx.push({ type: 'ring', x, y, r0, r1, col, t: 0, dur });
+const ring = (x, y, r0, r1, col, dur) => settings.vfx && G.fx.push({ type: 'ring', x, y, r0, r1, col, t: 0, dur });
 // 이펙트 스프라이트 한 번 재생. rate: 재생 속도 배율, ground: (x, y)가 그림 아래쪽 끝 (번개처럼 땅에 내리꽂히는 것)
 function fxSprite(key, x, y, scale = 1, { rate = 1, ground = false } = {}) {
   if (G.fx.length > 160) return;
   const f = FX[key];
+  if (!settings.vfx && !f.loop) return; // 펑 터지는 것만 끈다 (번개처럼 계속 도는 건 공격 모양)
   G.fx.push({ type: 'sprite', key, x, y: ground ? y - f.fh * scale / 2 : y, scale, rate, t: 0, dur: f.n / f.fps / rate });
 }
 function text(x, y, v, col, big) { if (G.texts.length < 70) G.texts.push({ x: x + rand(-8, 8), y, v, col, big, t: 0 }); }
@@ -636,6 +643,7 @@ function drawGround(cx, cy) {
   for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) {
     ctx.fillStyle = (i + j) & 1 ? th.a : th.b; ctx.fillRect(i * T, j * T, T + .5, T + .5);
     const h = hash(i, j), x = i * T + 10 + hash(j, i) * 60, y = j * T + 10 + h * 60;
+    if (lowQ()) continue; // 낮은 품질: 바닥 장식 없이 바둑판만
     if (h < .1) { ctx.fillStyle = th.spot; ctx.beginPath(); ctx.ellipse(x, y, 7, 4.5, 0, 0, TAU); ctx.fill(); }
     else if (h < .2) { ctx.strokeStyle = th.grass; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x - 7, y - 8); ctx.moveTo(x, y); ctx.lineTo(x, y - 10); ctx.moveTo(x + 5, y); ctx.lineTo(x + 7, y - 8); ctx.stroke(); }
     else if (h < .23) { ctx.fillStyle = th.spark; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }
@@ -653,7 +661,7 @@ function eyes(r, ang, white = '#fff', pupil = '#14161c', dy = -r * .15) {
 function drawEnemy(e) {
   const r = e.r, z = e.z || 0, fl = e.flash > 0 && !e.boss, col = fl ? '#ffffff' : e.col, t = G.t + e.ph;
   const look = Math.atan2(G.p.y - e.y, G.p.x - e.x);
-  shadow(e.x, e.y + r * .8, r * (z > 0 ? Math.max(.4, 1 - z / 200) : 1));
+  if (!lowQ()) shadow(e.x, e.y + r * .8, r * (z > 0 ? Math.max(.4, 1 - z / 200) : 1));
   ctx.save(); ctx.translate(e.x, e.y - z);
   switch (e.look) {
     case 'slime': {
@@ -736,7 +744,7 @@ function drawTelegraph(e) {
 }
 function drawPlayer(p) {
   const bob = Math.abs(Math.sin(p.walk)) * 3;
-  shadow(p.x, p.y + p.r * .9, p.r);
+  if (!lowQ()) shadow(p.x, p.y + p.r * .9, p.r);
   if (p.inv > 0 && Math.floor(G.t * 20) % 2) return;
   ctx.save(); ctx.translate(p.x, p.y - bob);
   paintHero(ctx, p.r, curSkin(), { ox: Math.cos(p.face) * 4, oy: Math.sin(p.face) * 3, hurt: p.hurt > 0, t: G.t });
@@ -810,6 +818,17 @@ function drawDrops() {
     }
   }
 }
+// 판정 원 (설정에서 켬): 플레이어 초록, 적 빨강, 적 탄 주황, 내 투사체·장판 하늘색
+function drawHitboxes() {
+  const ring = (x, y, r, col) => { ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(x, y, Math.max(1, r), 0, TAU); ctx.stroke(); };
+  ctx.lineWidth = 1.5 / zoom; ctx.globalAlpha = .9;
+  for (const z of G.zones) ring(z.x, z.y, z.r, '#5ad1ff');
+  for (const s of G.shots) ring(s.x, s.y, s.r, '#5ad1ff');
+  for (const e of G.enemies) if (!e.dead) ring(e.x, e.y, e.r, '#ff4d5e');
+  for (const b of G.bullets) ring(b.x, b.y, b.r, '#ffa62b');
+  if (G.phase !== 'over') ring(G.p.x, G.p.y, G.p.r, '#4dff88');
+  ctx.globalAlpha = 1;
+}
 function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (!G) { // 로비 뒤 배경
@@ -819,7 +838,7 @@ function draw() {
   }
   const p = G.p, c = G.cam;
   c.x += (p.x - c.x) * .15; c.y += (p.y - c.y) * .15;
-  const sx = (Math.random() - .5) * G.shake * 30, sy = (Math.random() - .5) * G.shake * 30;
+  const sh = settings.vfx ? G.shake * 30 : 0, sx = (Math.random() - .5) * sh, sy = (Math.random() - .5) * sh;
   ctx.save(); ctx.translate(W / 2 + sx, H / 2 + sy); ctx.scale(zoom, zoom); ctx.translate(-c.x, -c.y);
   drawGround(c.x, c.y);
   drawDrops();
@@ -862,6 +881,7 @@ function draw() {
     ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3; ctx.strokeText(o.v, o.x, o.y); ctx.fillStyle = o.col; ctx.fillText(o.v, o.x, o.y);
   }
   ctx.globalAlpha = 1;
+  if (settings.hitbox) drawHitboxes();
   ctx.restore();
 
   // 화면 밖 보스 방향 표시

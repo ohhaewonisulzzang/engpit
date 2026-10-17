@@ -662,6 +662,10 @@ main{margin-bottom:var(--navh)}
 .prof h3{margin:0;font-size:20px}
 .prof .auth-sub{margin:0}
 .prof-cur{color:var(--coin)}
+.trow .seg{flex:none;background:var(--surface)}
+.trow .seg button{font-size:13px;padding:6px 11px}
+.trow .seg button.on{background:var(--good);color:#06291a}
+@media (max-width:420px){.trow:has(.seg){flex-direction:column;align-items:stretch}.trow .seg{align-self:flex-start}}
 .tchip{background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--coin);border:1px solid color-mix(in srgb,var(--coin) 50%,transparent);border-radius:999px;padding:4px 10px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
 .tchip[hidden]{display:none}
 @media (max-width:699px){.tchip{display:none}}

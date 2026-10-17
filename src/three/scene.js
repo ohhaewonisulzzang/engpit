@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { $ } from '../dom.js';
+import { settings, pixelRatio, onSettings } from '../settings.js';
 import { V3, std, addBasic, glowTex, makeEnv } from './helpers.js';
 
 /* =========================================================
@@ -7,12 +8,19 @@ import { V3, std, addBasic, glowTex, makeEnv } from './helpers.js';
    ========================================================= */
 export const stage = $('stage');
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
 stage.prepend(renderer.domElement);
 
 export const scene = new THREE.Scene();
+// 그래픽 설정(settings.js): 렌더링 해상도는 픽셀 배율, 낮은 품질은 그림자를 끈다 (재질을 다시 만들어야 그림자가 바뀐다)
+onSettings(() => {
+  renderer.setPixelRatio(pixelRatio());
+  const sh = settings.quality !== 'low';
+  if (renderer.shadowMap.enabled === sh) return;
+  renderer.shadowMap.enabled = sh;
+  scene.traverse(o => [].concat(o.material || []).forEach(m => { m.needsUpdate = true; }));
+});
 scene.background = new THREE.Color(0x0b2f33);
 scene.fog = new THREE.Fog(0x0b2f33, 16, 34);
 scene.environment = makeEnv(renderer);
