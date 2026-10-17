@@ -431,7 +431,7 @@ function updateArm(a, dt) {
     for (let i = 0, n = d.count + m.proj; i < n && near.length; i++) {
       const e = near.splice(Math.floor(Math.random() * near.length), 1)[0], sr = d.splash * m.area;
       if (d.strike) fxSprite(d.strike, e.x, e.y + e.r * .5, d.strike === 'lightning' ? 1.6 : .8, { rate: 2, ground: true });
-      else G.fx.push({ type: 'bolt', x: e.x, y: e.y, t: 0, dur: .28, seed: Math.random() * 99, col: d.col });
+      else if (settings.vfx) G.fx.push({ type: 'bolt', x: e.x, y: e.y, t: 0, dur: .28, seed: Math.random() * 99, col: d.col });
       for (const o of G.enemies) if (!o.dead && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < (sr + o.r) ** 2) strike(o, a, 0, 0);
       puff(e.x, e.y, '#cff4ff', 8, 140);
     }
@@ -486,7 +486,8 @@ function updateShots(dt) {
 }
 
 /* ---------- 이펙트 ---------- */
-// 이펙트를 끄면(settings.vfx) 파티클·고리·한 번 터지는 스프라이트·화면 흔들림이 없어지고, 무기 공격 모양(휘두르기·찌르기·번개)만 남는다
+// 이펙트를 끄면(settings.vfx) 파티클·고리·번개·폭발 스프라이트·블랙홀·휘두르기 궤적·빛 번짐·화면 흔들림이 전부 없어진다
+// (무기 그림, 적, 적 탄처럼 피해야 하는 것은 남는다. 피해 판정은 그대로)
 function puff(x, y, col, n, sp) {
   if (!settings.vfx) return;
   n = Math.max(1, Math.round(n * partK()));
@@ -498,9 +499,8 @@ function puff(x, y, col, n, sp) {
 const ring = (x, y, r0, r1, col, dur) => settings.vfx && G.fx.push({ type: 'ring', x, y, r0, r1, col, t: 0, dur });
 // 이펙트 스프라이트 한 번 재생. rate: 재생 속도 배율, ground: (x, y)가 그림 아래쪽 끝 (번개처럼 땅에 내리꽂히는 것)
 function fxSprite(key, x, y, scale = 1, { rate = 1, ground = false } = {}) {
-  if (G.fx.length > 160) return;
+  if (!settings.vfx || G.fx.length > 160) return;
   const f = FX[key];
-  if (!settings.vfx && !f.loop) return; // 펑 터지는 것만 끈다 (번개처럼 계속 도는 건 공격 모양)
   G.fx.push({ type: 'sprite', key, x, y: ground ? y - f.fh * scale / 2 : y, scale, rate, t: 0, dur: f.n / f.fps / rate });
 }
 function text(x, y, v, col, big) { if (G.texts.length < 70) G.texts.push({ x: x + rand(-8, 8), y, v, col, big, t: 0 }); }
@@ -771,15 +771,19 @@ function drawArms() {
   for (const f of G.fx) {
     if (f.type === 'thrust') {
       const u = f.t / f.dur, out = Math.sin(u * Math.PI) * f.reach * .55, c = Math.cos(f.ang), s = Math.sin(f.ang);
-      ctx.globalAlpha = (1 - u) * .4; ctx.strokeStyle = f.a.col; ctx.lineWidth = 14; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + c * f.reach, p.y + s * f.reach); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+      if (settings.vfx) {
+        ctx.globalAlpha = (1 - u) * .4; ctx.strokeStyle = f.a.col; ctx.lineWidth = 14; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + c * f.reach, p.y + s * f.reach); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+      }
       drawImg(f.a, p.x + c * out, p.y + s * out, f.ang, f.reach * .75);
       continue;
     }
     if (f.type !== 'swing') continue;
     const u = easeOut(f.t / f.dur), start = f.spin ? f.ang : f.ang - f.dir * f.arc / 2, cur = start + f.dir * u * f.arc;
-    ctx.globalAlpha = (1 - f.t / f.dur) * .45; ctx.strokeStyle = f.a.col; ctx.lineWidth = f.reach * .4;
-    ctx.beginPath(); ctx.arc(p.x, p.y, f.reach * .72, Math.min(start, cur), Math.max(start, cur)); ctx.stroke(); ctx.globalAlpha = 1;
+    if (settings.vfx) {
+      ctx.globalAlpha = (1 - f.t / f.dur) * .45; ctx.strokeStyle = f.a.col; ctx.lineWidth = f.reach * .4;
+      ctx.beginPath(); ctx.arc(p.x, p.y, f.reach * .72, Math.min(start, cur), Math.max(start, cur)); ctx.stroke(); ctx.globalAlpha = 1;
+    }
     drawImg(f.a, p.x, p.y, cur, f.reach * 1.15);
   }
 }
@@ -788,21 +792,22 @@ function drawShots() {
     const d = s.a.d;
     if (d.arrow) {
       const a = Math.atan2(s.vy, s.vx), c = Math.cos(a), sn = Math.sin(a);
-      ctx.globalAlpha = .35; ctx.strokeStyle = '#8adfff'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(s.x - c * 26, s.y - sn * 26); ctx.lineTo(s.x, s.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(s.x - c * 26, s.y - sn * 26); ctx.lineTo(s.x, s.y);
+      if (settings.vfx) { ctx.globalAlpha = .35; ctx.strokeStyle = '#8adfff'; ctx.lineWidth = 8; ctx.stroke(); }
       ctx.globalAlpha = 1; ctx.strokeStyle = '#e8fbff'; ctx.lineWidth = 3; ctx.stroke();
       circle(s.x, s.y, 4, '#ffffff'); continue;
     }
     if (d.stone) { circle(s.x, s.y, s.r + 2, '#7d7768'); circle(s.x - 1, s.y - 1, s.r * .5, '#a9a291'); continue; }
-    if (d.fire) { ctx.globalAlpha = .4; circle(s.x, s.y, s.r * 2.4, '#ff6a3d'); ctx.globalAlpha = 1; circle(s.x, s.y, s.r * 1.2, '#ffc83d'); circle(s.x, s.y, s.r * .6, '#fff6d8'); continue; }
+    if (d.fire) { if (settings.vfx) { ctx.globalAlpha = .4; circle(s.x, s.y, s.r * 2.4, '#ff6a3d'); ctx.globalAlpha = 1; } circle(s.x, s.y, s.r * 1.2, '#ffc83d'); circle(s.x, s.y, s.r * .6, '#fff6d8'); continue; }
     const L = d.size * modsFor(s.a).area;
-    if (d.kind === 'nova') { ctx.globalAlpha = .3; circle(s.x, s.y, L * .4, `hsl(${(G.t * 300 + s.x) % 360},100%,65%)`); ctx.globalAlpha = 1; }
+    if (d.kind === 'nova' && settings.vfx) { ctx.globalAlpha = .3; circle(s.x, s.y, L * .4, `hsl(${(G.t * 300 + s.x) % 360},100%,65%)`); ctx.globalAlpha = 1; }
     drawImg(s.a, s.x, s.y, d.spinning ? s.t * 16 : Math.atan2(s.vy, s.vx), L, true);
   }
   for (const b of G.bullets) {
     if (b.arrow) {
       const a = Math.atan2(b.vy, b.vx); ctx.strokeStyle = '#e8d8a8'; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(b.x - Math.cos(a) * 12, b.y - Math.sin(a) * 12); ctx.lineTo(b.x, b.y); ctx.stroke(); circle(b.x, b.y, 3, b.col);
-    } else { ctx.globalAlpha = .35; circle(b.x, b.y, b.r * 1.9, b.col); ctx.globalAlpha = 1; circle(b.x, b.y, b.r, b.col); circle(b.x, b.y, b.r * .45, '#fff'); }
+    } else { if (settings.vfx) { ctx.globalAlpha = .35; circle(b.x, b.y, b.r * 1.9, b.col); ctx.globalAlpha = 1; } circle(b.x, b.y, b.r, b.col); circle(b.x, b.y, b.r * .45, '#fff'); }
   }
 }
 function drawDrops() {
@@ -843,7 +848,7 @@ function draw() {
   drawGround(c.x, c.y);
   drawDrops();
   G.enemies.forEach(e => e.boss && drawTelegraph(e));
-  for (const z of G.zones) { // 블랙홀
+  if (settings.vfx) for (const z of G.zones) { // 블랙홀
     const life = z.a.d.life, k = Math.min(1, z.t * 4, (life - z.t) * 3);
     ctx.save(); ctx.translate(z.x, z.y); ctx.scale(k, k);
     ctx.globalAlpha = .35; circle(0, 0, z.r, '#3a0a6a'); ctx.globalAlpha = 1;

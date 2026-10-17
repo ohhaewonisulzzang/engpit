@@ -13,7 +13,7 @@ import { settings, setSetting } from '../settings.js';
 const OPTS = [
   { k: 'res', name: '렌더링 해상도', desc: '낮추면 화면이 조금 흐려지지만 더 부드럽게 돌아가요', v: [['low', '낮음'], ['mid', '보통'], ['high', '높음']] },
   { k: 'quality', name: '그래픽 품질', desc: '낮음은 그림자·바닥 장식·파티클을 줄여요', v: [['low', '낮음'], ['mid', '보통'], ['high', '높음']] },
-  { k: 'vfx', name: '이펙트 (VFX)', desc: '파티클·폭발·화면 흔들림. 꺼도 무기 공격 모양은 보여요', v: [[true, '켜기'], [false, '끄기']] },
+  { k: 'vfx', name: '이펙트 (VFX)', desc: '번개·폭발·파티클·휘두르기 궤적·화면 흔들림을 전부 꺼요', v: [[true, '켜기'], [false, '끄기']] },
   { k: 'hitbox', name: '히트박스 표시', desc: '전투에서 나·적·탄의 판정 범위를 원으로 보여 줘요', v: [[true, '켜기'], [false, '끄기']] },
 ];
 const settingsCard = () => `<div class="auth-card prof">

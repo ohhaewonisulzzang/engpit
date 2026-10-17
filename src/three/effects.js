@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { V3, basic, addBasic, glowTex, disposeObj } from './helpers.js';
 import { stage, renderer, scene, camera } from './scene.js';
+import { settings, partK } from '../settings.js';
 
 // 연출용 오브젝트
 export const dimmer = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), basic(0x041a1d, { transparent: true, opacity: 0, depthWrite: false }));
@@ -18,6 +19,8 @@ export function makeRays(color, rainbow) {
 }
 export const bursts = [];
 export function burst(pos, color, count, speed, size = .09) {
+  if (!settings.vfx) return; // 이펙트 끄기 (settings.js)
+  count = Math.max(1, Math.round(count * partK()));
   const geo = new THREE.BufferGeometry(), p = new Float32Array(count * 3), cols = new Float32Array(count * 3), v = [], c = new THREE.Color();
   for (let i = 0; i < count; i++) {
     p.set([pos.x, pos.y, pos.z], i * 3);
